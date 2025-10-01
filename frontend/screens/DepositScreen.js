@@ -15,7 +15,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = 'https://money-tracker-95ny.onrender.com/api';
 const DepositScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         amount: '',

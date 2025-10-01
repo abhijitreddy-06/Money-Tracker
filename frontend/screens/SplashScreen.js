@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = 'https://money-tracker-95ny.onrender.com/api';
 const SplashScreen = ({ navigation }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.3)).current;

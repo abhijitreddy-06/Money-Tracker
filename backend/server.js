@@ -88,7 +88,7 @@ app.post('/api/register', (req, res) => {
 
 
 //user login
-app.post('/login', (req, res) => {
+app.post('/api/login', (req, res) => {
     const { phone, password } = req.body;
 
     if (!phone || !password) {

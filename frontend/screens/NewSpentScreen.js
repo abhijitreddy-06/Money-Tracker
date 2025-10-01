@@ -15,7 +15,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 import api from "../api/api";
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = 'https://money-tracker-95ny.onrender.com/api';
 const NewSpentScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         amount: '',

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = '//https://money-tracker-95ny.onrender.com/api';
 const LoginScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         phone: '',

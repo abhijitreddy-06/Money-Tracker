@@ -14,7 +14,7 @@ import {
     SafeAreaView
 } from 'react-native';
 import axios from 'axios';
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = 'https://money-tracker-95ny.onrender.com/api';
 const RegisterScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         name: '',

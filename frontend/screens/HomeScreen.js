@@ -10,7 +10,7 @@ import {
     ScrollView,
     SafeAreaView
 } from 'react-native';
-const API_URL = 'https://money-tracker-05ny.onrender.com/api';
+const API_URL = 'https://money-tracker-95ny.onrender.com/api';
 const HomeScreen = ({ navigation }) => {
     const menuItems = [
         {
