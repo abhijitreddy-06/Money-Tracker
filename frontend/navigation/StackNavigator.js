@@ -13,6 +13,7 @@ import DepositScreen from '../screens/DepositScreen';
 import CheckBalanceScreen from '../screens/CheckBalanceScreen';
 import BalanceInputScreen from '../screens/BalanceInputScreen';
 import HistoryScreen from '../screens/HistroyScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 const Stack = createNativeStackNavigator();
 
 export default function StackNavigator() {
@@ -34,9 +35,10 @@ export default function StackNavigator() {
                 <Stack.Screen name="BorrowedMoney" component={BorrowedMoneyScreen} />
 
                 <Stack.Screen name="Deposit" component={DepositScreen} />
-                <Stack.Screen name="Profile" component={CheckBalanceScreen} />
+                <Stack.Screen name="balance" component={CheckBalanceScreen} />
                 <Stack.Screen name="BalanceInput" component={BalanceInputScreen} />
                 <Stack.Screen name="History" component={HistoryScreen} />
+                <Stack.Screen name="Profile" component={ProfileScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

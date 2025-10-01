@@ -3,7 +3,7 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
 const api = axios.create({
-    baseURL: "http://172.16.7.155:3000",
+    baseURL: "http://YOUR_IP_ADDRESS:3000",
 });
 
 // Interceptor: attach token before every request

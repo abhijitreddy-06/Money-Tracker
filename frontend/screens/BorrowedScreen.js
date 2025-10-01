@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, Animated, Alert, Dimensions, FlatList
+    ScrollView, Animated, Alert, Dimensions, FlatList,
+    SafeAreaView
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import api from "../api/api"; // your axios instance
+import api from "../api/api";
 import * as SecureStore from 'expo-secure-store';
 
 const BorrowedMoneyScreen = ({ navigation }) => {
@@ -17,12 +18,14 @@ const BorrowedMoneyScreen = ({ navigation }) => {
     const [focusedField, setFocusedField] = useState(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [isLoading, setIsLoading] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const buttonScale = useRef(new Animated.Value(1)).current;
 
     const commonLenders = [
-        { id: 1, name: 'Family Member', icon: '👨‍👩‍👧‍👦' },
+        { id: 1, name: 'Family', icon: '👨‍👩‍👧‍👦' },
         { id: 2, name: 'Friend', icon: '👫' },
         { id: 3, name: 'Bank', icon: '🏦' },
         { id: 4, name: 'Colleague', icon: '💼' },
@@ -36,7 +39,6 @@ const BorrowedMoneyScreen = ({ navigation }) => {
 
     const handleLenderSelect = (lender) => {
         handleInputChange('fromWhom', lender.name);
-        Alert.alert('Lender Selected', `${lender.icon} ${lender.name}`);
     };
 
     const handleDateChange = (event, date) => {
@@ -48,7 +50,22 @@ const BorrowedMoneyScreen = ({ navigation }) => {
     };
 
     const formatDateForDisplay = (date) =>
-        `Due: ${date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+        `${date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+
+    const animateButton = () => {
+        Animated.sequence([
+            Animated.timing(buttonScale, {
+                toValue: 0.95,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(buttonScale, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            })
+        ]).start();
+    };
 
     const handleSubmit = async () => {
         const { amount, what, fromWhom, dueDate } = formData;
@@ -58,8 +75,10 @@ const BorrowedMoneyScreen = ({ navigation }) => {
             return;
         }
 
+        animateButton();
+        setIsLoading(true);
+
         try {
-            // Retrieve token from SecureStore
             const token = await SecureStore.getItemAsync('authToken');
 
             if (!token) {
@@ -84,6 +103,8 @@ const BorrowedMoneyScreen = ({ navigation }) => {
         } catch (err) {
             console.error('Borrow submit error:', err.response?.data || err.message);
             Alert.alert('Error', err.response?.data?.message || 'Something went wrong');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -111,28 +132,44 @@ const BorrowedMoneyScreen = ({ navigation }) => {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+            {/* Navigation Header */}
             <View style={[styles.header, isTablet && styles.headerTablet]}>
-                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                    <Text style={styles.backIcon}>←</Text>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={handleBack}
+                    activeOpacity={0.7}
+                >
                 </TouchableOpacity>
+
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logoIcon}>💼</Text>
-                    <Text style={styles.logoText}>MoneyTracker</Text>
+                    <View style={styles.logoCircle}>
+                        <Text style={styles.logoText}>MT</Text>
+                    </View>
+                    <Text style={styles.appName}>MoneyTracker</Text>
                 </View>
-                <View style={styles.placeholder} />
+
+                <View style={styles.headerPlaceholder} />
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                    {/* Header Section */}
                     <View style={styles.titleContainer}>
-                        <Text style={styles.titleIcon}>📥</Text>
+                        <View style={styles.titleIconContainer}>
+                            <Text style={styles.titleIcon}>📥</Text>
+                        </View>
                         <Text style={styles.title}>Add Borrowed Money</Text>
-                        <Text style={styles.subtitle}>Track money you've borrowed</Text>
+                        <Text style={styles.subtitle}>Track money you've borrowed from others</Text>
                     </View>
 
+                    {/* Amount Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Amount (₹) *</Text>
+                        <Text style={styles.label}>Amount Borrowed (₹)</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'amount' && styles.inputFocused]}
                             value={formData.amount}
@@ -141,23 +178,27 @@ const BorrowedMoneyScreen = ({ navigation }) => {
                             onBlur={() => setFocusedField(null)}
                             keyboardType="decimal-pad"
                             placeholder="Enter amount"
+                            placeholderTextColor="#94a3b8"
                         />
                     </View>
 
+                    {/* Purpose Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>For What *</Text>
+                        <Text style={styles.label}>Purpose</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'what' && styles.inputFocused]}
                             value={formData.what}
                             onChangeText={val => handleInputChange('what', val)}
                             onFocus={() => setFocusedField('what')}
                             onBlur={() => setFocusedField(null)}
-                            placeholder="Purpose of borrowing"
+                            placeholder="Reason for borrowing"
+                            placeholderTextColor="#94a3b8"
                         />
                     </View>
 
+                    {/* Lender Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>From Whom *</Text>
+                        <Text style={styles.label}>Borrowed From</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'fromWhom' && styles.inputFocused]}
                             value={formData.fromWhom}
@@ -165,16 +206,18 @@ const BorrowedMoneyScreen = ({ navigation }) => {
                             onFocus={() => setFocusedField('fromWhom')}
                             onBlur={() => setFocusedField(null)}
                             placeholder="Person or institution"
+                            placeholderTextColor="#94a3b8"
                         />
                     </View>
 
+                    {/* Due Date */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Due Date *</Text>
+                        <Text style={styles.label}>Due Date</Text>
                         <TouchableOpacity
                             style={[styles.dateInput, focusedField === 'dueDate' && styles.inputFocused]}
                             onPress={() => setShowDatePicker(true)}
                         >
-                            <Text>{formatDateForDisplay(formData.dueDate)}</Text>
+                            <Text style={styles.dateText}>{formatDateForDisplay(formData.dueDate)}</Text>
                         </TouchableOpacity>
                         {showDatePicker && (
                             <DateTimePicker
@@ -187,116 +230,172 @@ const BorrowedMoneyScreen = ({ navigation }) => {
                         )}
                     </View>
 
-                    <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                        <Text style={styles.submitButtonText}>Add Borrowed Money</Text>
-                    </TouchableOpacity>
+                    {/* Submit Button */}
+                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                        <TouchableOpacity
+                            style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                            onPress={handleSubmit}
+                            activeOpacity={0.9}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.submitButtonText}>
+                                {isLoading ? 'Adding...' : 'Add Borrowed Money'}
+                            </Text>
+                        </TouchableOpacity>
+                    </Animated.View>
 
-                    <View style={styles.lendersSection}>
-                        <Text style={styles.lendersTitle}>Quick Lenders</Text>
-                        <FlatList
-                            data={commonLenders}
-                            renderItem={renderLenderItem}
-                            keyExtractor={item => item.id.toString()}
-                            numColumns={3}
-                        />
-                    </View>
                 </Animated.View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
-
-
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f9ff',
+        backgroundColor: '#ffffff',
     },
     header: {
-        backgroundColor: '#1976D2',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 2,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 3,
+        minHeight: 60,
     },
     headerTablet: {
-        paddingVertical: 20,
+        paddingHorizontal: 40,
     },
     backButton: {
-        padding: 8,
+        flex: 1,
+        maxWidth: 80,
+    },
+    backButtonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     backIcon: {
         fontSize: 20,
-        color: 'white',
+        color: '#2563eb',
         fontWeight: 'bold',
+        marginRight: 6,
+    },
+    backText: {
+        fontSize: 16,
+        color: '#2563eb',
+        fontWeight: '600',
+        fontFamily: 'System',
     },
     logoContainer: {
+        flex: 2,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    logoIcon: {
-        fontSize: 20,
-        marginRight: 8,
+    logoCircle: {
+        width: 36,
+        height: 36,
+        backgroundColor: '#2563eb',
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        shadowColor: '#2563eb',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     logoText: {
-        fontSize: 18,
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#ffffff',
+        fontFamily: 'System',
+    },
+    appName: {
+        fontSize: 20,
         fontWeight: '700',
-        color: 'white',
+        color: '#1e293b',
+        fontFamily: 'System',
         letterSpacing: 0.5,
     },
-    placeholder: {
-        width: 36,
+    headerPlaceholder: {
+        flex: 1,
+        maxWidth: 80,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        padding: 24,
         paddingBottom: 40,
+        backgroundColor: '#f8fafc',
     },
     formContainer: {
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
+        padding: 24,
+        shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 5,
+            height: 8,
         },
         shadowOpacity: 0.1,
         shadowRadius: 20,
-        elevation: 10,
-        marginBottom: 20,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     titleContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 32,
+    },
+    titleIconContainer: {
+        width: 70,
+        height: 70,
+        backgroundColor: '#dbeafe',
+        borderRadius: 35,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     titleIcon: {
-        fontSize: 40,
-        marginBottom: 10,
+        fontSize: 30,
     },
     title: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 8,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
-        color: '#666',
+        color: '#64748b',
+        fontFamily: 'System',
         textAlign: 'center',
+        lineHeight: 22,
     },
     inputGroup: {
         marginBottom: 20,
@@ -304,105 +403,89 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: '#334155',
         marginBottom: 8,
-    },
-    required: {
-        color: '#d32f2f',
+        fontFamily: 'System',
     },
     input: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 16,
         fontSize: 16,
-        color: '#333',
+        color: '#1e293b',
         fontFamily: 'System',
     },
     inputFocused: {
-        borderColor: '#1976D2',
-        backgroundColor: 'white',
-        shadowColor: '#1976D2',
+        borderColor: '#2563eb',
+        backgroundColor: '#ffffff',
+        shadowColor: '#2563eb',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     dateInput: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        paddingVertical: 16,
     },
     dateText: {
         fontSize: 16,
-        color: '#333',
-    },
-    placeholderText: {
-        color: '#999',
-    },
-    calendarIcon: {
-        fontSize: 18,
-    },
-    dateHint: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 5,
-        marginLeft: 4,
-        fontStyle: 'italic',
+        color: '#1e293b',
+        fontFamily: 'System',
     },
     submitButton: {
-        backgroundColor: '#1976D2',
+        backgroundColor: '#2563eb',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 10,
-        marginBottom: 25,
-        shadowColor: '#1976D2',
-        shadowOffset: { width: 0, height: 4 },
+        marginBottom: 24,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    submitButtonDisabled: {
+        opacity: 0.7,
     },
     submitButtonText: {
-        color: 'white',
+        color: '#ffffff',
         fontSize: 18,
         fontWeight: '600',
-        letterSpacing: 0.5,
+        fontFamily: 'System',
     },
     lendersSection: {
-        marginTop: 10,
+        marginTop: 8,
     },
     lendersTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 4,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     lendersSubtitle: {
         fontSize: 14,
-        color: '#666',
+        color: '#64748b',
         textAlign: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
+        fontFamily: 'System',
     },
     lendersGrid: {
         paddingHorizontal: 5,
     },
-    lenderRow: {
-        justifyContent: 'space-between',
-        marginBottom: 10,
-    },
     lenderItem: {
         alignItems: 'center',
-        backgroundColor: '#f8f9ff',
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
         padding: 12,
         margin: 4,
@@ -410,7 +493,7 @@ const styles = StyleSheet.create({
         minWidth: 90,
         maxWidth: 100,
         borderWidth: 1,
-        borderColor: '#e6e9ff',
+        borderColor: '#e2e8f0',
     },
     lenderIcon: {
         fontSize: 20,
@@ -419,110 +502,10 @@ const styles = StyleSheet.create({
     lenderName: {
         fontSize: 11,
         fontWeight: '500',
-        color: '#1976D2',
+        color: '#2563eb',
         textAlign: 'center',
         lineHeight: 14,
-    },
-    recordsContainer: {
-        backgroundColor: 'white',
-        borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    recordsTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#333',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    recordsList: {
-        padding: 0,
-    },
-    emptyList: {
-        minHeight: 200,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    listItem: {
-        backgroundColor: '#fafafa',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    itemDetails: {
-        flex: 1,
-    },
-    itemTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 8,
-    },
-    itemMeta: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-    },
-    metaText: {
-        fontSize: 12,
-        color: '#666',
-        marginRight: 15,
-        marginBottom: 4,
-    },
-    itemActions: {
-        flexDirection: 'row',
-    },
-    actionButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-        backgroundColor: '#1976D2',
-        marginLeft: 8,
-    },
-    deleteButton: {
-        backgroundColor: '#d32f2f',
-    },
-    editButtonText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    deleteButtonText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    emptyIcon: {
-        fontSize: 40,
-        marginBottom: 16,
-        opacity: 0.5,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    emptySubtext: {
-        fontSize: 14,
-        color: '#999',
-        textAlign: 'center',
+        fontFamily: 'System',
     },
 });
 

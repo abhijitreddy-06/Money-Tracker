@@ -9,7 +9,8 @@ import {
     Animated,
     Dimensions,
     ActivityIndicator,
-    Alert
+    Alert,
+    SafeAreaView
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
@@ -17,6 +18,7 @@ import * as SecureStore from 'expo-secure-store';
 const HistoryScreen = ({ navigation }) => {
     const [historyRecords, setHistoryRecords] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -45,10 +47,10 @@ const HistoryScreen = ({ navigation }) => {
             const token = await SecureStore.getItemAsync('authToken');
             if (!token) {
                 Alert.alert('Error', 'You are not logged in. Please login again.');
-                navigation.navigate('LoginScreen');
+                navigation.navigate('Login');
                 return;
             }
-            const response = await axios.get('http://172.16.7.155:3000/history', {
+            const response = await axios.get('http://YOUR_IP_ADDRESS:3000/history', {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setHistoryRecords(response.data);
@@ -57,28 +59,40 @@ const HistoryScreen = ({ navigation }) => {
             Alert.alert('Error', 'Failed to fetch history.');
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    const renderRecordItem = ({ item }) => {
+    const handleRefresh = () => {
+        setRefreshing(true);
+        fetchHistory();
+    };
+
+    const renderRecordItem = ({ item, index }) => {
         let icon = '💰';
-        let color = '#28a745';
+        let color = '#10b981';
+        let typeColor = '#64748b';
+
         switch (item.type) {
             case 'Spend':
                 icon = '💸';
-                color = '#d32f2f';
+                color = '#ef4444';
+                typeColor = '#ef4444';
                 break;
             case 'Lent':
                 icon = '🤝';
-                color = '#1976D2';
+                color = '#3b82f6';
+                typeColor = '#3b82f6';
                 break;
             case 'Borrowed':
                 icon = '📥';
-                color = '#f57c00';
+                color = '#f59e0b';
+                typeColor = '#f59e0b';
                 break;
             case 'Deposit':
                 icon = '💰';
-                color = '#28a745';
+                color = '#10b981';
+                typeColor = '#10b981';
                 break;
         }
 
@@ -87,26 +101,64 @@ const HistoryScreen = ({ navigation }) => {
         }) : '';
 
         return (
-            <View style={styles.listItem}>
-                <View style={styles.itemMain}>
-                    <View style={styles.amountContainer}>
-                        <Text style={[styles.amountText, { color }]}>{icon} ₹{item.amount}</Text>
-                        <Text style={styles.dateText}>{recordDate}</Text>
-                    </View>
-                    <View style={styles.sourceContainer}>
-                        <Text style={styles.sourceText}>{item.description}</Text>
-                        {item.details && <Text style={styles.detailsText}>{item.details}</Text>}
-                    </View>
+            <Animated.View
+                style={[
+                    styles.listItem,
+                    {
+                        opacity: fadeAnim,
+                        transform: [
+                            {
+                                translateY: slideAnim.interpolate({
+                                    inputRange: [0, 30],
+                                    outputRange: [0, 30 - (index * 5)]
+                                })
+                            }
+                        ]
+                    }
+                ]}
+            >
+                <View style={styles.itemIconContainer}>
+                    <Text style={styles.itemIcon}>{icon}</Text>
                 </View>
-            </View>
+
+                <View style={styles.itemContent}>
+                    <View style={styles.itemHeader}>
+                        <Text style={styles.itemDescription} numberOfLines={1}>
+                            {item.description || 'Transaction'}
+                        </Text>
+                        <Text style={[styles.amountText, { color }]}>
+                            ₹{item.amount}
+                        </Text>
+                    </View>
+
+                    <View style={styles.itemFooter}>
+                        <Text style={[styles.itemType, { color: typeColor }]}>
+                            {item.type}
+                        </Text>
+                        <Text style={styles.dateText}>
+                            {recordDate}
+                        </Text>
+                    </View>
+
+                    {item.details && (
+                        <Text style={styles.detailsText} numberOfLines={1}>
+                            {item.details}
+                        </Text>
+                    )}
+                </View>
+            </Animated.View>
         );
     };
 
     const ListEmptyComponent = () => (
         <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={styles.emptyText}>No history records yet.</Text>
-            <Text style={styles.emptySubtext}>Your transactions will appear here.</Text>
+            <View style={styles.emptyIconContainer}>
+                <Text style={styles.emptyIcon}>📄</Text>
+            </View>
+            <Text style={styles.emptyText}>No History Yet</Text>
+            <Text style={styles.emptySubtext}>
+                Your transactions will appear here once you start using the app
+            </Text>
         </View>
     );
 
@@ -115,92 +167,345 @@ const HistoryScreen = ({ navigation }) => {
     };
 
     return (
-        <View style={styles.container}>
-            {/* Header */}
+        <SafeAreaView style={styles.container}>
+            {/* Navigation Header */}
             <View style={[styles.header, isTablet && styles.headerTablet]}>
-                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                    <Text style={styles.backIcon}>←</Text>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={handleBack}
+                    activeOpacity={0.7}
+                >
+
                 </TouchableOpacity>
+
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logoIcon}>📜</Text>
-                    <Text style={styles.logoText}>History</Text>
+                    <View style={styles.logoCircle}>
+                        <Text style={styles.logoText}>MT</Text>
+                    </View>
+                    <Text style={styles.appName}>MoneyTracker</Text>
                 </View>
-                <View style={styles.placeholder} />
+
+                <View style={styles.headerPlaceholder} />
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                <Animated.View
-                    style={{
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }],
-                    }}
-                >
-                    {loading ? (
-                        <ActivityIndicator size="large" color="#1976D2" style={{ marginTop: 50 }} />
-                    ) : (
+            {/* Content */}
+            <View style={styles.content}>
+                <View style={styles.headerCard}>
+                    <View style={styles.titleContainer}>
+                        <View style={styles.titleIconContainer}>
+                            <Text style={styles.titleIcon}>📜</Text>
+                        </View>
+                        <Text style={styles.title}>Transaction History</Text>
+                        <Text style={styles.subtitle}>
+                            {historyRecords.length} total transactions
+                        </Text>
+                    </View>
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#2563eb" />
+                        <Text style={styles.loadingText}>Loading your history...</Text>
+                    </View>
+                ) : (
+                    <Animated.View
+                        style={[
+                            styles.recordsContainer,
+                            { opacity: fadeAnim }
+                        ]}
+                    >
                         <FlatList
                             data={historyRecords}
                             renderItem={renderRecordItem}
                             keyExtractor={(item, index) => index.toString()}
                             ListEmptyComponent={ListEmptyComponent}
-                            scrollEnabled={false}
-                            contentContainerStyle={historyRecords.length === 0 ? styles.emptyList : styles.recordsList}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={
+                                historyRecords.length === 0 ? styles.emptyList : styles.recordsList
+                            }
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
                         />
-                    )}
-                </Animated.View>
-            </ScrollView>
-        </View>
+                    </Animated.View>
+                )}
+            </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f5f9ff' },
+    container: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+    },
     header: {
-        backgroundColor: '#1976D2',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 3,
+        minHeight: 60,
     },
-    headerTablet: { paddingVertical: 20 },
-    backButton: { padding: 8 },
-    backIcon: { fontSize: 20, color: 'white', fontWeight: 'bold' },
-    logoContainer: { flexDirection: 'row', alignItems: 'center' },
-    logoIcon: { fontSize: 20, marginRight: 8 },
-    logoText: { fontSize: 18, fontWeight: '700', color: 'white', letterSpacing: 0.5 },
-    placeholder: { width: 36 },
-    scrollView: { flex: 1 },
-    scrollContent: { padding: 20, paddingBottom: 40 },
-    listItem: {
-        backgroundColor: '#fafafa',
+    headerTablet: {
+        paddingHorizontal: 40,
+    },
+    backButton: {
+        flex: 1,
+        maxWidth: 80,
+    },
+    backButtonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    backIcon: {
+        fontSize: 20,
+        color: '#2563eb',
+        fontWeight: 'bold',
+        marginRight: 6,
+    },
+    backText: {
+        fontSize: 16,
+        color: '#2563eb',
+        fontWeight: '600',
+        fontFamily: 'System',
+    },
+    logoContainer: {
+        flex: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoCircle: {
+        width: 40,
+        height: 40,
+        backgroundColor: '#2563eb',
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        shadowColor: '#2563eb',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    logoText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#ffffff',
+        fontFamily: 'System',
+    },
+    appName: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1e293b',
+        fontFamily: 'System',
+        letterSpacing: 0.5,
+    },
+    headerPlaceholder: {
+        flex: 1,
+        maxWidth: 80,
+    },
+    content: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+    },
+    headerCard: {
+        backgroundColor: '#ffffff',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    titleContainer: {
+        alignItems: 'center',
+    },
+    titleIconContainer: {
+        width: 60,
+        height: 60,
+        backgroundColor: '#dbeafe',
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    titleIcon: {
+        fontSize: 24,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 4,
+        fontFamily: 'System',
+        textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: 16,
+        color: '#64748b',
+        fontFamily: 'System',
+        textAlign: 'center',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#64748b',
+        marginTop: 16,
+        fontFamily: 'System',
+    },
+    recordsContainer: {
+        flex: 1,
+        padding: 16,
+    },
+    recordsList: {
+        paddingBottom: 20,
+    },
+    emptyList: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    listItem: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderColor: '#f1f5f9',
+    },
+    itemIconContainer: {
+        width: 48,
+        height: 48,
+        backgroundColor: '#f8fafc',
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    itemIcon: {
+        fontSize: 20,
+    },
+    itemContent: {
+        flex: 1,
+    },
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    itemDescription: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1e293b',
+        fontFamily: 'System',
+        flex: 1,
+        marginRight: 12,
+    },
+    amountText: {
+        fontSize: 18,
+        fontWeight: '700',
+        fontFamily: 'System',
+    },
+    itemFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    itemMain: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    amountContainer: { alignItems: 'flex-start' },
-    amountText: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
-    dateText: { fontSize: 12, color: '#666' },
-    sourceContainer: { alignItems: 'flex-end' },
-    sourceText: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 2 },
-    detailsText: { fontSize: 12, color: '#666' },
-    recordsList: { padding: 0 },
-    emptyList: { minHeight: 200, justifyContent: 'center', alignItems: 'center' },
-    emptyState: { alignItems: 'center', paddingVertical: 40 },
-    emptyIcon: { fontSize: 40, marginBottom: 16, opacity: 0.5 },
-    emptyText: { fontSize: 16, color: '#666', marginBottom: 8, textAlign: 'center' },
-    emptySubtext: { fontSize: 14, color: '#999', textAlign: 'center' },
+    itemType: {
+        fontSize: 14,
+        fontWeight: '500',
+        fontFamily: 'System',
+        textTransform: 'capitalize',
+    },
+    dateText: {
+        fontSize: 14,
+        color: '#64748b',
+        fontFamily: 'System',
+    },
+    detailsText: {
+        fontSize: 14,
+        color: '#94a3b8',
+        fontFamily: 'System',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 60,
+        paddingHorizontal: 40,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    emptyIcon: {
+        fontSize: 32,
+        opacity: 0.5,
+    },
+    emptyText: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#64748b',
+        marginBottom: 8,
+        textAlign: 'center',
+        fontFamily: 'System',
+    },
+    emptySubtext: {
+        fontSize: 16,
+        color: '#94a3b8',
+        textAlign: 'center',
+        lineHeight: 22,
+        fontFamily: 'System',
+    },
 });
 
 export default HistoryScreen;

@@ -9,11 +9,12 @@ import {
     Animated,
     Alert,
     Dimensions,
-    FlatList
+    FlatList,
+    SafeAreaView
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store'; // for storing JWT
+import * as SecureStore from 'expo-secure-store';
 
 const DepositScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -24,36 +25,22 @@ const DepositScreen = ({ navigation }) => {
     const [focusedField, setFocusedField] = useState(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [depositRecords, setDepositRecords] = useState([
-        {
-            id: '1',
-            amount: '15,000',
-            fromWhom: 'Salary',
-            date: '2024-01-15',
-            formattedDate: '15 Jan 2024'
-        },
-        {
-            id: '2',
-            amount: '5,000',
-            fromWhom: 'Freelance Work',
-            date: '2024-01-10',
-            formattedDate: '10 Jan 2024'
-        }
-    ]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [depositRecords, setDepositRecords] = useState([]);
 
-    // Animation values
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const buttonScale = useRef(new Animated.Value(1)).current;
 
     const commonSources = [
-        { id: 1, name: 'Salary', icon: '💰', type: 'income' },
-        { id: 2, name: 'Freelance', icon: '💻', type: 'income' },
-        { id: 3, name: 'Investment', icon: '📈', type: 'income' },
-        { id: 4, name: 'Gift', icon: '🎁', type: 'other' },
-        { id: 5, name: 'Refund', icon: '↩️', type: 'other' },
-        { id: 6, name: 'Bonus', icon: '⭐', type: 'income' },
-        { id: 7, name: 'Business', icon: '🏢', type: 'income' },
-        { id: 8, name: 'Other', icon: '📥', type: 'other' },
+        { id: 1, name: 'Salary', icon: '💰' },
+        { id: 2, name: 'Freelance', icon: '💻' },
+        { id: 3, name: 'Investment', icon: '📈' },
+        { id: 4, name: 'Gift', icon: '🎁' },
+        { id: 5, name: 'Refund', icon: '↩️' },
+        { id: 6, name: 'Bonus', icon: '⭐' },
+        { id: 7, name: 'Business', icon: '🏢' },
+        { id: 8, name: 'Other', icon: '📥' },
     ];
 
     const handleInputChange = (field, value) => {
@@ -65,7 +52,6 @@ const DepositScreen = ({ navigation }) => {
 
     const handleSourceSelect = (source) => {
         handleInputChange('fromWhom', source.name);
-        Alert.alert('Source Selected', `${source.icon} ${source.name}`, [], { cancelable: true });
     };
 
     const handleDateChange = (event, date) => {
@@ -91,29 +77,40 @@ const DepositScreen = ({ navigation }) => {
         });
     };
 
-  
+    const animateButton = () => {
+        Animated.sequence([
+            Animated.timing(buttonScale, {
+                toValue: 0.95,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(buttonScale, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            })
+        ]).start();
+    };
 
     const handleSubmit = async () => {
-        try {
-            // Get token from SecureStore
-            const token = await SecureStore.getItemAsync('authToken');
+        if (!formData.amount || !formData.fromWhom || !formData.date) {
+            Alert.alert('Error', 'Please fill all fields before submitting.');
+            return;
+        }
 
-            console.log('Token being sent:', token);
+        animateButton();
+        setIsLoading(true);
+
+        try {
+            const token = await SecureStore.getItemAsync('authToken');
 
             if (!token) {
                 Alert.alert('Error', 'You are not logged in. Please log in again.');
                 return;
             }
 
-            // Validate form inputs
-            if (!formData.amount || !formData.fromWhom || !formData.date) {
-                Alert.alert('Error', 'Please fill all fields before submitting.');
-                return;
-            }
-
-            // POST request with Authorization header
             const response = await axios.post(
-                'http://172.16.7.155:3000/deposit',
+                'http://YOUR_IP_ADDRESS:3000/deposit',
                 {
                     amount: formData.amount,
                     fromWhom: formData.fromWhom,
@@ -124,72 +121,29 @@ const DepositScreen = ({ navigation }) => {
                 }
             );
 
-            console.log('Deposit response:', response.data);
             Alert.alert('Success', response.data.message);
 
             // Reset form
             setFormData({ amount: '', fromWhom: '', date: new Date() });
             setSelectedDate(new Date());
-        } catch (error) {
-            console.log('Error response:', error.response?.data || error.message);
 
+        } catch (error) {
             if (error.response?.status === 401 || error.response?.status === 403) {
-                Alert.alert(
-                    'Unauthorized',
-                    'Your session has expired or token is invalid. Please log in again.'
-                );
-                // Optional: navigate to login screen
-                navigation.navigate('LoginScreen');
+                Alert.alert('Unauthorized', 'Your session has expired. Please log in again.');
+                navigation.navigate('Login');
             } else {
                 Alert.alert('Error', 'Something went wrong. Try again.');
             }
+        } finally {
+            setIsLoading(false);
         }
-    };
-
-
-
-
-
-    const handleEdit = (record) => {
-        Alert.alert('Edit Record', `Edit deposit of ₹${record.amount}`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Edit', onPress: () => {
-                    // Pre-fill form with record data
-                    setFormData({
-                        amount: record.amount,
-                        fromWhom: record.fromWhom,
-                        date: new Date(record.date)
-                    });
-                    setSelectedDate(new Date(record.date));
-
-                    // Remove from list
-                    setDepositRecords(prev => prev.filter(item => item.id !== record.id));
-                }
-            }
-        ]);
-    };
-
-    const handleDelete = (record) => {
-        Alert.alert('Delete Record', `Are you sure you want to delete deposit of ₹${record.amount}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete', style: 'destructive', onPress: () => {
-                    setDepositRecords(prev => prev.filter(item => item.id !== record.id));
-                    Alert.alert('Deleted', 'Deposit record deleted successfully');
-                }
-            }
-        ]);
     };
 
     const handleBack = () => {
-        if (navigation) {
-            navigation.goBack();
-        }
+        navigation.goBack();
     };
 
     React.useEffect(() => {
-        // Start animations when component mounts
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -209,10 +163,7 @@ const DepositScreen = ({ navigation }) => {
 
     const renderSourceItem = ({ item }) => (
         <TouchableOpacity
-            style={[
-                styles.sourceItem,
-                item.type === 'income' ? styles.incomeSource : styles.otherSource
-            ]}
+            style={styles.sourceItem}
             onPress={() => handleSourceSelect(item)}
             activeOpacity={0.7}
         >
@@ -221,66 +172,34 @@ const DepositScreen = ({ navigation }) => {
         </TouchableOpacity>
     );
 
-    const renderDepositItem = ({ item }) => (
-        <View style={styles.listItem}>
-            <View style={styles.itemMain}>
-                <View style={styles.amountContainer}>
-                    <Text style={styles.amountText}>₹{item.amount}</Text>
-                    <Text style={styles.dateText}>{item.formattedDate}</Text>
-                </View>
-                <View style={styles.sourceContainer}>
-                    <Text style={styles.sourceText}>{item.fromWhom}</Text>
-                </View>
-            </View>
-            <View style={styles.itemActions}>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleEdit(item)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.editButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(item)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-
     const ListEmptyComponent = () => (
         <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>💰</Text>
-            <Text style={styles.emptyText}>No deposit records yet.</Text>
-            <Text style={styles.emptySubtext}>Add your first deposit above!</Text>
+            <Text style={styles.emptyText}>No deposit records yet</Text>
+            <Text style={styles.emptySubtext}>Add your first deposit above</Text>
         </View>
     );
 
-    // Calculate total deposits
-    const totalDeposits = depositRecords.reduce((total, record) => {
-        const amount = parseFloat(record.amount.replace(/,/g, '')) || 0;
-        return total + amount;
-    }, 0);
-
     return (
-        <View style={styles.container}>
-            {/* Header */}
+        <SafeAreaView style={styles.container}>
+            {/* Navigation Header */}
             <View style={[styles.header, isTablet && styles.headerTablet]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={handleBack}
                     activeOpacity={0.7}
                 >
-                    <Text style={styles.backIcon}>←</Text>
+
                 </TouchableOpacity>
+
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logoIcon}>💼</Text>
-                    <Text style={styles.logoText}>MoneyTracker</Text>
+                    <View style={styles.logoCircle}>
+                        <Text style={styles.logoText}>MT</Text>
+                    </View>
+                    <Text style={styles.appName}>MoneyTracker</Text>
                 </View>
-                <View style={styles.placeholder} />
+
+                <View style={styles.headerPlaceholder} />
             </View>
 
             <ScrollView
@@ -300,16 +219,16 @@ const DepositScreen = ({ navigation }) => {
                 >
                     {/* Title Section */}
                     <View style={styles.titleContainer}>
-                        <Text style={styles.titleIcon}>💵</Text>
+                        <View style={styles.titleIconContainer}>
+                            <Text style={styles.titleIcon}>💵</Text>
+                        </View>
                         <Text style={styles.title}>Add Deposit</Text>
                         <Text style={styles.subtitle}>Record your income and deposits</Text>
                     </View>
 
                     {/* Amount Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>
-                            Amount (₹) <Text style={styles.required}>*</Text>
-                        </Text>
+                        <Text style={styles.label}>Amount (₹)</Text>
                         <TextInput
                             style={[
                                 styles.input,
@@ -320,7 +239,7 @@ const DepositScreen = ({ navigation }) => {
                             onFocus={() => setFocusedField('amount')}
                             onBlur={() => setFocusedField(null)}
                             placeholder="Enter deposit amount"
-                            placeholderTextColor="#999"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="decimal-pad"
                             returnKeyType="next"
                         />
@@ -328,9 +247,7 @@ const DepositScreen = ({ navigation }) => {
 
                     {/* From Whom Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>
-                            From Whom <Text style={styles.required}>*</Text>
-                        </Text>
+                        <Text style={styles.label}>Source</Text>
                         <TextInput
                             style={[
                                 styles.input,
@@ -340,17 +257,15 @@ const DepositScreen = ({ navigation }) => {
                             onChangeText={(value) => handleInputChange('fromWhom', value)}
                             onFocus={() => setFocusedField('fromWhom')}
                             onBlur={() => setFocusedField(null)}
-                            placeholder="Source of deposit (e.g., Salary, Gift)"
-                            placeholderTextColor="#999"
+                            placeholder="Source of deposit"
+                            placeholderTextColor="#94a3b8"
                             returnKeyType="next"
                         />
                     </View>
 
                     {/* Date Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>
-                            Date <Text style={styles.required}>*</Text>
-                        </Text>
+                        <Text style={styles.label}>Date</Text>
                         <TouchableOpacity
                             style={[
                                 styles.dateInput,
@@ -359,13 +274,9 @@ const DepositScreen = ({ navigation }) => {
                             onPress={showDatepicker}
                             activeOpacity={0.8}
                         >
-                            <Text style={[
-                                styles.dateText,
-                                !formData.date && styles.placeholderText
-                            ]}>
-                                {formData.date ? formatDate(formData.date) : 'Select deposit date'}
+                            <Text style={styles.dateText}>
+                                {formatDate(formData.date)}
                             </Text>
-                            <Text style={styles.calendarIcon}>📅</Text>
                         </TouchableOpacity>
 
                         {showDatePicker && (
@@ -377,157 +288,176 @@ const DepositScreen = ({ navigation }) => {
                                 maximumDate={new Date()}
                             />
                         )}
-                        <Text style={styles.dateHint}>Date when you received the money</Text>
                     </View>
 
                     {/* Submit Button */}
-                    <TouchableOpacity
-                        style={styles.submitButton}
-                        onPress={handleSubmit}
-                        activeOpacity={0.9}
-                    >
-                        <Text style={styles.submitButtonText}>Add Deposit</Text>
-                    </TouchableOpacity>
+                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                        <TouchableOpacity
+                            style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                            onPress={handleSubmit}
+                            activeOpacity={0.9}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.submitButtonText}>
+                                {isLoading ? 'Adding Deposit...' : 'Add Deposit'}
+                            </Text>
+                        </TouchableOpacity>
+                    </Animated.View>
 
-                    {/* Quick Sources */}
-                    <View style={styles.sourcesSection}>
-                        <Text style={styles.sourcesTitle}>Quick Sources</Text>
-                        <Text style={styles.sourcesSubtitle}>Tap to select a source</Text>
-
-                        <FlatList
-                            data={commonSources}
-                            renderItem={renderSourceItem}
-                            keyExtractor={(item) => item.id.toString()}
-                            numColumns={4}
-                            scrollEnabled={false}
-                            contentContainerStyle={styles.sourcesGrid}
-                            columnWrapperStyle={isTablet ? null : styles.sourceRow}
-                        />
-                    </View>
                 </Animated.View>
 
-                {/* Summary Card */}
-                <View style={styles.summaryContainer}>
-                    <Text style={styles.summaryTitle}>Deposit Summary</Text>
-                    <View style={styles.summaryContent}>
-                        <View style={styles.summaryItem}>
-                            <Text style={styles.summaryLabel}>Total Deposits</Text>
-                            <Text style={styles.summaryValue}>₹{totalDeposits.toLocaleString()}</Text>
-                        </View>
-                        <View style={styles.summaryItem}>
-                            <Text style={styles.summaryLabel}>Records Count</Text>
-                            <Text style={styles.summaryValue}>{depositRecords.length}</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Deposit Records List */}
-                <View style={styles.recordsContainer}>
-                    <Text style={styles.recordsTitle}>Recent Deposits</Text>
-
-                    <FlatList
-                        data={depositRecords}
-                        renderItem={renderDepositItem}
-                        keyExtractor={(item) => item.id}
-                        scrollEnabled={false}
-                        ListEmptyComponent={ListEmptyComponent}
-                        contentContainerStyle={depositRecords.length === 0 ? styles.emptyList : styles.recordsList}
-                    />
-                </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f9ff',
+        backgroundColor: '#ffffff',
     },
     header: {
-        backgroundColor: '#1976D2',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 2,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 3,
+        minHeight: 60,
     },
     headerTablet: {
-        paddingVertical: 20,
+        paddingHorizontal: 40,
     },
     backButton: {
-        padding: 8,
+        flex: 1,
+        maxWidth: 80,
+    },
+    backButtonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     backIcon: {
         fontSize: 20,
-        color: 'white',
+        color: '#2563eb',
         fontWeight: 'bold',
+        marginRight: 6,
+    },
+    backText: {
+        fontSize: 16,
+        color: '#2563eb',
+        fontWeight: '600',
+        fontFamily: 'System',
     },
     logoContainer: {
+        flex: 2,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    logoIcon: {
-        fontSize: 20,
-        marginRight: 8,
+    logoCircle: {
+        width: 40,
+        height: 40,
+        backgroundColor: '#2563eb',
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        shadowColor: '#2563eb',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     logoText: {
-        fontSize: 18,
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#ffffff',
+        fontFamily: 'System',
+    },
+    appName: {
+        fontSize: 20,
         fontWeight: '700',
-        color: 'white',
+        color: '#1e293b',
+        fontFamily: 'System',
         letterSpacing: 0.5,
     },
-    placeholder: {
-        width: 36,
+    headerPlaceholder: {
+        flex: 1,
+        maxWidth: 80,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        padding: 24,
         paddingBottom: 40,
+        backgroundColor: '#f8fafc',
     },
     formContainer: {
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
+        padding: 24,
+        shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 5,
+            height: 8,
         },
         shadowOpacity: 0.1,
         shadowRadius: 20,
-        elevation: 10,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
         marginBottom: 20,
     },
     titleContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 32,
+    },
+    titleIconContainer: {
+        width: 70,
+        height: 70,
+        backgroundColor: '#dbeafe',
+        borderRadius: 35,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     titleIcon: {
-        fontSize: 40,
-        marginBottom: 10,
+        fontSize: 30,
     },
     title: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 8,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
-        color: '#666',
+        color: '#64748b',
+        fontFamily: 'System',
         textAlign: 'center',
+        lineHeight: 22,
     },
     inputGroup: {
         marginBottom: 20,
@@ -535,104 +465,89 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: '#334155',
         marginBottom: 8,
-    },
-    required: {
-        color: '#d32f2f',
+        fontFamily: 'System',
     },
     input: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 16,
         fontSize: 16,
-        color: '#333',
+        color: '#1e293b',
         fontFamily: 'System',
     },
     inputFocused: {
-        borderColor: '#1976D2',
-        backgroundColor: 'white',
-        shadowColor: '#1976D2',
+        borderColor: '#2563eb',
+        backgroundColor: '#ffffff',
+        shadowColor: '#2563eb',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     dateInput: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        paddingVertical: 16,
     },
     dateText: {
         fontSize: 16,
-        color: '#333',
-    },
-    placeholderText: {
-        color: '#999',
-    },
-    calendarIcon: {
-        fontSize: 18,
-    },
-    dateHint: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 5,
-        marginLeft: 4,
-        fontStyle: 'italic',
+        color: '#1e293b',
+        fontFamily: 'System',
     },
     submitButton: {
-        backgroundColor: '#28a745',
+        backgroundColor: '#2563eb',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 10,
-        marginBottom: 25,
-        shadowColor: '#28a745',
-        shadowOffset: { width: 0, height: 4 },
+        marginBottom: 24,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    submitButtonDisabled: {
+        opacity: 0.7,
     },
     submitButtonText: {
-        color: 'white',
+        color: '#ffffff',
         fontSize: 18,
         fontWeight: '600',
-        letterSpacing: 0.5,
+        fontFamily: 'System',
     },
     sourcesSection: {
-        marginTop: 10,
+        marginTop: 8,
     },
     sourcesTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 4,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     sourcesSubtitle: {
         fontSize: 14,
-        color: '#666',
+        color: '#64748b',
         textAlign: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
+        fontFamily: 'System',
     },
     sourcesGrid: {
         paddingHorizontal: 5,
     },
-    sourceRow: {
-        justifyContent: 'space-between',
-        marginBottom: 10,
-    },
     sourceItem: {
         alignItems: 'center',
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
         padding: 12,
         margin: 4,
@@ -640,14 +555,7 @@ const styles = StyleSheet.create({
         minWidth: 70,
         maxWidth: 80,
         borderWidth: 1,
-    },
-    incomeSource: {
-        backgroundColor: '#e8f5e8',
-        borderColor: '#c8e6c9',
-    },
-    otherSource: {
-        backgroundColor: '#fff3e0',
-        borderColor: '#ffe0b2',
+        borderColor: '#e2e8f0',
     },
     sourceIcon: {
         fontSize: 20,
@@ -656,138 +564,79 @@ const styles = StyleSheet.create({
     sourceName: {
         fontSize: 11,
         fontWeight: '500',
-        color: '#333',
+        color: '#2563eb',
         textAlign: 'center',
         lineHeight: 14,
-    },
-    summaryContainer: {
-        backgroundColor: 'white',
-        borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
-        marginBottom: 20,
-    },
-    summaryTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#333',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    summaryContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
-    summaryItem: {
-        alignItems: 'center',
-    },
-    summaryLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
-    },
-    summaryValue: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#28a745',
+        fontFamily: 'System',
     },
     recordsContainer: {
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
+        padding: 24,
+        shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 5,
+            height: 8,
         },
         shadowOpacity: 0.1,
         shadowRadius: 20,
-        elevation: 10,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     recordsTitle: {
         fontSize: 20,
-        fontWeight: '700',
-        color: '#333',
+        fontWeight: '600',
+        color: '#1e293b',
         marginBottom: 20,
+        fontFamily: 'System',
         textAlign: 'center',
     },
-    recordsList: {
-        padding: 0,
-    },
-    emptyList: {
-        minHeight: 200,
-        justifyContent: 'center',
+    recordItem: {
+        flexDirection: 'row',
         alignItems: 'center',
-    },
-    listItem: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        borderColor: '#e2e8f0',
     },
-    itemMain: {
+    recordIcon: {
+        width: 40,
+        height: 40,
+        backgroundColor: '#dbeafe',
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    recordIconText: {
+        fontSize: 16,
+    },
+    recordDetails: {
         flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
     },
-    amountContainer: {
-        alignItems: 'flex-start',
-    },
-    amountText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#28a745',
-        marginBottom: 4,
-    },
-    dateText: {
-        fontSize: 12,
-        color: '#666',
-    },
-    sourceContainer: {
-        alignItems: 'flex-end',
-    },
-    sourceText: {
-        fontSize: 14,
+    recordAmount: {
+        fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: '#1e293b',
+        fontFamily: 'System',
         marginBottom: 4,
     },
-    itemActions: {
-        flexDirection: 'row',
-        marginLeft: 10,
+    recordSource: {
+        fontSize: 14,
+        color: '#64748b',
+        fontFamily: 'System',
     },
-    actionButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-        backgroundColor: '#1976D2',
-        marginLeft: 8,
-    },
-    deleteButton: {
-        backgroundColor: '#d32f2f',
-    },
-    editButtonText: {
-        color: 'white',
+    recordDate: {
         fontSize: 12,
-        fontWeight: '500',
+        color: '#94a3b8',
+        fontFamily: 'System',
     },
-    deleteButtonText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: '500',
+    emptyList: {
+        minHeight: 200,
+        justifyContent: 'center',
     },
     emptyState: {
         alignItems: 'center',
@@ -800,14 +649,16 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-        color: '#666',
+        color: '#64748b',
         marginBottom: 8,
         textAlign: 'center',
+        fontFamily: 'System',
     },
     emptySubtext: {
         fontSize: 14,
-        color: '#999',
+        color: '#94a3b8',
         textAlign: 'center',
+        fontFamily: 'System',
     },
 });
 

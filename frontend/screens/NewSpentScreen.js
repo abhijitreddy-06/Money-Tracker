@@ -9,10 +9,10 @@ import {
     Animated,
     Alert,
     Dimensions,
-    FlatList
+    FlatList,
+    SafeAreaView
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import api from "../api/api";
 
@@ -26,9 +26,11 @@ const NewSpentScreen = ({ navigation }) => {
     const [focusedField, setFocusedField] = useState(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [isLoading, setIsLoading] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const buttonScale = useRef(new Animated.Value(1)).current;
 
     const quickCategories = [
         { id: 1, name: 'Food & Dining', icon: '🍔' },
@@ -47,7 +49,6 @@ const NewSpentScreen = ({ navigation }) => {
 
     const handleCategorySelect = (category) => {
         handleInputChange('what', category.name);
-        Alert.alert('Category Selected', `${category.icon} ${category.name}`);
     };
 
     const handleDateChange = (event, date) => {
@@ -59,7 +60,22 @@ const NewSpentScreen = ({ navigation }) => {
     };
 
     const formatDate = (date) =>
-        date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+    const animateButton = () => {
+        Animated.sequence([
+            Animated.timing(buttonScale, {
+                toValue: 0.95,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(buttonScale, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            })
+        ]).start();
+    };
 
     const handleSubmit = async () => {
         if (!formData.amount || !formData.what) {
@@ -67,12 +83,23 @@ const NewSpentScreen = ({ navigation }) => {
             return;
         }
 
+        animateButton();
+        setIsLoading(true);
+
         try {
+            const token = await SecureStore.getItemAsync('authToken');
+            if (!token) {
+                Alert.alert('Error', 'You are not logged in. Please login again.');
+                return;
+            }
+
             const response = await api.post('/spend', {
                 amount: formData.amount,
                 for_what: formData.what,
                 place: formData.where,
                 date: formData.date
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
             Alert.alert('Success!', response.data.message || 'Expense added successfully');
@@ -84,11 +111,10 @@ const NewSpentScreen = ({ navigation }) => {
         } catch (error) {
             console.error("Submit error:", error.response?.data || error.message);
             Alert.alert('Error', error.response?.data?.message || 'Something went wrong');
+        } finally {
+            setIsLoading(false);
         }
     };
-
-
-
 
     const handleBack = () => navigation?.goBack();
 
@@ -103,56 +129,73 @@ const NewSpentScreen = ({ navigation }) => {
     const isTablet = width > 768;
 
     const renderCategoryItem = ({ item }) => (
-        <TouchableOpacity style={styles.categoryItem} onPress={() => handleCategorySelect(item)}>
+        <TouchableOpacity
+            style={styles.categoryItem}
+            onPress={() => handleCategorySelect(item)}
+            activeOpacity={0.7}
+        >
             <Text style={styles.categoryIcon}>{item.icon}</Text>
             <Text style={styles.categoryName} numberOfLines={2}>{item.name}</Text>
         </TouchableOpacity>
     );
 
     return (
-        <View style={styles.container}>
-            {/* Header */}
+        <SafeAreaView style={styles.container}>
+            {/* Navigation Header */}
             <View style={[styles.header, isTablet && styles.headerTablet]}>
-                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                    <Text style={styles.backIcon}>←</Text>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={handleBack}
+                    activeOpacity={0.7}
+                >
                 </TouchableOpacity>
+
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logoIcon}>💼</Text>
-                    <Text style={styles.logoText}>MoneyTracker</Text>
+                    <View style={styles.logoCircle}>
+                        <Text style={styles.logoText}>MT</Text>
+                    </View>
+                    <Text style={styles.appName}>MoneyTracker</Text>
                 </View>
-                <View style={styles.placeholder} />
+
+                <View style={styles.headerPlaceholder} />
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <Animated.View style={[styles.formContainer, {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideAnim }]
+                }]}>
+                    {/* Title Section */}
                     <View style={styles.titleContainer}>
-                        <Text style={styles.titleIcon}>💸</Text>
-                        <Text style={styles.title}>New Spent Money</Text>
-                        <Text style={styles.subtitle}>Track your expenses effortlessly</Text>
+                        <View style={styles.titleIconContainer}>
+                            <Text style={styles.titleIcon}>💸</Text>
+                        </View>
+                        <Text style={styles.title}>Add Expense</Text>
+                        <Text style={styles.subtitle}>Track your spending easily</Text>
                     </View>
 
-                    {/* Amount */}
+                    {/* Amount Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>
-                            Amount (₹) <Text style={styles.required}>*</Text>
-                        </Text>
+                        <Text style={styles.label}>Amount (₹)</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'amount' && styles.inputFocused]}
                             value={formData.amount}
                             onChangeText={(value) => handleInputChange('amount', value)}
                             onFocus={() => setFocusedField('amount')}
                             onBlur={() => setFocusedField(null)}
-                            placeholder="Enter amount in rupees"
-                            placeholderTextColor="#999"
+                            placeholder="Enter amount"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="decimal-pad"
                         />
                     </View>
 
-                    {/* What */}
+                    {/* What Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>
-                            For What <Text style={styles.required}>*</Text>
-                        </Text>
+                        <Text style={styles.label}>Description</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'what' && styles.inputFocused]}
                             value={formData.what}
@@ -160,35 +203,35 @@ const NewSpentScreen = ({ navigation }) => {
                             onFocus={() => setFocusedField('what')}
                             onBlur={() => setFocusedField(null)}
                             placeholder="What did you spend on?"
-                            placeholderTextColor="#999"
+                            placeholderTextColor="#94a3b8"
                         />
                     </View>
 
-                    {/* Where */}
+                    {/* Where Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Where</Text>
+                        <Text style={styles.label}>Location (Optional)</Text>
                         <TextInput
                             style={[styles.input, focusedField === 'where' && styles.inputFocused]}
                             value={formData.where}
                             onChangeText={(value) => handleInputChange('where', value)}
                             onFocus={() => setFocusedField('where')}
                             onBlur={() => setFocusedField(null)}
-                            placeholder="Where did you spend? (Optional)"
-                            placeholderTextColor="#999"
+                            placeholder="Where did you spend?"
+                            placeholderTextColor="#94a3b8"
                         />
                     </View>
 
-                    {/* Date */}
+                    {/* Date Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Date <Text style={styles.required}>*</Text></Text>
+                        <Text style={styles.label}>Date</Text>
                         <TouchableOpacity
                             style={[styles.dateInput, focusedField === 'date' && styles.inputFocused]}
                             onPress={() => setShowDatePicker(true)}
+                            activeOpacity={0.8}
                         >
                             <Text style={styles.dateText}>
-                                {formData.date ? formatDate(formData.date) : 'Select a date'}
+                                {formatDate(formData.date)}
                             </Text>
-                            <Text style={styles.calendarIcon}>📅</Text>
                         </TouchableOpacity>
                         {showDatePicker && (
                             <DateTimePicker
@@ -201,118 +244,171 @@ const NewSpentScreen = ({ navigation }) => {
                         )}
                     </View>
 
-                    {/* Submit */}
-                    <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                        <Text style={styles.submitButtonText}>Add Expense</Text>
-                    </TouchableOpacity>
-
-                    {/* Categories */}
-                    <View style={styles.categoriesSection}>
-                        <Text style={styles.categoriesTitle}>Quick Categories</Text>
-                        <Text style={styles.categoriesSubtitle}>Tap to select a category</Text>
-                        <FlatList
-                            data={quickCategories}
-                            renderItem={renderCategoryItem}
-                            keyExtractor={(item) => item.id.toString()}
-                            numColumns={4}
-                            scrollEnabled={false}
-                            contentContainerStyle={styles.categoriesGrid}
-                            columnWrapperStyle={isTablet ? null : styles.categoryRow}
-                        />
-                    </View>
+                    {/* Submit Button */}
+                    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                        <TouchableOpacity
+                            style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                            onPress={handleSubmit}
+                            activeOpacity={0.9}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.submitButtonText}>
+                                {isLoading ? 'Adding Expense...' : 'Add Expense'}
+                            </Text>
+                        </TouchableOpacity>
+                    </Animated.View>
                 </Animated.View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 };
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f9ff',
+        backgroundColor: '#ffffff',
     },
     header: {
-        backgroundColor: '#1976D2',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 2,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 3,
+        minHeight: 60,
     },
     headerTablet: {
-        paddingVertical: 20,
+        paddingHorizontal: 40,
     },
     backButton: {
-        padding: 8,
+        flex: 1,
+        maxWidth: 80,
+    },
+    backButtonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#f8fafc',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     backIcon: {
         fontSize: 20,
-        color: 'white',
+        color: '#2563eb',
         fontWeight: 'bold',
+        marginRight: 6,
+    },
+    backText: {
+        fontSize: 16,
+        color: '#2563eb',
+        fontWeight: '600',
+        fontFamily: 'System',
     },
     logoContainer: {
+        flex: 2,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    logoIcon: {
-        fontSize: 20,
-        marginRight: 8,
+    logoCircle: {
+        width: 40,
+        height: 40,
+        backgroundColor: '#2563eb',
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        shadowColor: '#2563eb',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     logoText: {
-        fontSize: 18,
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#ffffff',
+        fontFamily: 'System',
+    },
+    appName: {
+        fontSize: 20,
         fontWeight: '700',
-        color: 'white',
+        color: '#1e293b',
+        fontFamily: 'System',
         letterSpacing: 0.5,
     },
-    placeholder: {
-        width: 36,
+    headerPlaceholder: {
+        flex: 1,
+        maxWidth: 80,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        padding: 24,
         paddingBottom: 40,
+        backgroundColor: '#f8fafc',
     },
     formContainer: {
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         borderRadius: 20,
-        padding: 25,
-        shadowColor: '#0052cc',
+        padding: 24,
+        shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 5,
+            height: 8,
         },
         shadowOpacity: 0.1,
         shadowRadius: 20,
-        elevation: 10,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     titleContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 32,
+    },
+    titleIconContainer: {
+        width: 70,
+        height: 70,
+        backgroundColor: '#fef2f2',
+        borderRadius: 35,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     titleIcon: {
-        fontSize: 40,
-        marginBottom: 10,
+        fontSize: 30,
     },
     title: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 8,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     subtitle: {
         fontSize: 16,
-        color: '#666',
+        color: '#64748b',
+        fontFamily: 'System',
         textAlign: 'center',
+        lineHeight: 22,
     },
     inputGroup: {
         marginBottom: 20,
@@ -320,98 +416,89 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: '#334155',
         marginBottom: 8,
-    },
-    required: {
-        color: '#d32f2f',
+        fontFamily: 'System',
     },
     input: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 16,
         fontSize: 16,
-        color: '#333',
+        color: '#1e293b',
         fontFamily: 'System',
     },
     inputFocused: {
-        borderColor: '#1976D2',
-        backgroundColor: 'white',
-        shadowColor: '#1976D2',
+        borderColor: '#2563eb',
+        backgroundColor: '#ffffff',
+        shadowColor: '#2563eb',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     dateInput: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        paddingVertical: 16,
     },
     dateText: {
         fontSize: 16,
-        color: '#333',
-    },
-    placeholderText: {
-        color: '#999',
-    },
-    calendarIcon: {
-        fontSize: 18,
+        color: '#1e293b',
+        fontFamily: 'System',
     },
     submitButton: {
-        backgroundColor: '#1976D2',
+        backgroundColor: '#2563eb',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 10,
-        marginBottom: 25,
-        shadowColor: '#1976D2',
-        shadowOffset: { width: 0, height: 4 },
+        marginBottom: 24,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    submitButtonDisabled: {
+        opacity: 0.7,
     },
     submitButtonText: {
-        color: 'white',
+        color: '#ffffff',
         fontSize: 18,
         fontWeight: '600',
-        letterSpacing: 0.5,
+        fontFamily: 'System',
     },
     categoriesSection: {
-        marginTop: 10,
+        marginTop: 8,
     },
     categoriesTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
-        marginBottom: 5,
+        color: '#1e293b',
+        marginBottom: 4,
+        fontFamily: 'System',
         textAlign: 'center',
     },
     categoriesSubtitle: {
         fontSize: 14,
-        color: '#666',
+        color: '#64748b',
         textAlign: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
+        fontFamily: 'System',
     },
     categoriesGrid: {
         paddingHorizontal: 5,
     },
-    categoryRow: {
-        justifyContent: 'space-between',
-        marginBottom: 10, 
-    },
     categoryItem: {
         alignItems: 'center',
-        backgroundColor: '#f8f9ff',
+        backgroundColor: '#f8fafc',
         borderRadius: 12,
         padding: 12,
         margin: 4,
@@ -419,7 +506,7 @@ const styles = StyleSheet.create({
         minWidth: 70,
         maxWidth: 80,
         borderWidth: 1,
-        borderColor: '#e6e9ff',
+        borderColor: '#e2e8f0',
     },
     categoryIcon: {
         fontSize: 20,
@@ -428,9 +515,10 @@ const styles = StyleSheet.create({
     categoryName: {
         fontSize: 11,
         fontWeight: '500',
-        color: '#1976D2',
+        color: '#2563eb',
         textAlign: 'center',
         lineHeight: 14,
+        fontFamily: 'System',
     },
 });
 

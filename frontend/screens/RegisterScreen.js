@@ -8,7 +8,10 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
-    Dimensions
+    Dimensions,
+    Animated,
+    ScrollView,
+    SafeAreaView
 } from 'react-native';
 import axios from 'axios';
 
@@ -20,12 +23,41 @@ const RegisterScreen = ({ navigation }) => {
     });
     const [focusedField, setFocusedField] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const buttonScale = new Animated.Value(1);
 
     const handleInputChange = (field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
+        if (field === 'phone') {
+            // Remove any non-digit characters and limit to 10 digits
+            const cleanedValue = value.replace(/[^0-9]/g, '');
+            if (cleanedValue.length <= 10) {
+                setFormData(prev => ({
+                    ...prev,
+                    [field]: cleanedValue
+                }));
+            }
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [field]: value
+            }));
+        }
+    };
+
+    const animateButton = () => {
+        Animated.sequence([
+            Animated.timing(buttonScale, {
+                toValue: 0.95,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(buttonScale, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            })
+        ]).start();
     };
 
     const handleSubmit = async () => {
@@ -36,15 +68,22 @@ const RegisterScreen = ({ navigation }) => {
             return;
         }
 
+        if (phone.length !== 10) {
+            Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+            return;
+        }
+
+        animateButton();
+        setIsLoading(true);
+
         try {
-            // Replace IP with your backend server IP/URL
-            const response = await axios.post('http://172.16.7.155:3000/register', formData);
+            const response = await axios.post('http://YOUR_IP_ADDRESS:3000/register', formData);
 
             if (response.status === 201) {
                 Alert.alert('Success', 'Account created successfully!', [
                     {
                         text: 'OK',
-                        onPress: () => navigation.replace('Login') // navigate to Login screen
+                        onPress: () => navigation.replace('Login')
                     }
                 ]);
             } else {
@@ -57,6 +96,8 @@ const RegisterScreen = ({ navigation }) => {
             } else {
                 Alert.alert('Error', 'Something went wrong. Please try again.');
             }
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -72,63 +113,79 @@ const RegisterScreen = ({ navigation }) => {
     const isTablet = width > 768;
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-        >
-            <View style={styles.background}>
-                <View style={[styles.cardContainer, isTablet && styles.cardContainerTablet]}>
-                    <View style={[styles.welcomeSection, isTablet && styles.welcomeSectionTablet]}>
-                        <View style={styles.circle1} />
-                        <View style={styles.circle2} />
-                        <View style={styles.welcomeContent}>
-                            <Text style={styles.welcomeTitle}>Create Account!</Text>
+        <SafeAreaView style={styles.container}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoid}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContainer}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Header Section */}
+                    <View style={styles.header}>
+                        <View style={styles.logoCircle}>
+                            <Text style={styles.logoText}>MT</Text>
                         </View>
+                        <Text style={styles.appName}>MoneyTracker</Text>
+                        <Text style={styles.welcomeSubtitle}>Create your account to get started</Text>
                     </View>
 
+                    {/* Register Card */}
                     <View style={[styles.registerCard, isTablet && styles.registerCardTablet]}>
-                        <View style={styles.logoContainer}>
-                            <Text style={styles.logoIcon}>💼</Text>
-                            <Text style={styles.logoText}>MoneyTracker</Text>
-                        </View>
-
-                        <Text style={styles.registerTitle}>Join MoneyTracker Today</Text>
+                        <Text style={styles.registerTitle}>Create Account</Text>
 
                         {/* Name Input */}
                         <View style={styles.formGroup}>
                             <Text style={styles.label}>Full Name</Text>
                             <TextInput
-                                style={[styles.input, focusedField === 'name' && styles.inputFocused]}
+                                style={[
+                                    styles.input,
+                                    focusedField === 'name' && styles.inputFocused
+                                ]}
                                 value={formData.name}
                                 onChangeText={(value) => handleInputChange('name', value)}
                                 onFocus={() => setFocusedField('name')}
                                 onBlur={() => setFocusedField(null)}
                                 placeholder="Enter your full name"
-                                placeholderTextColor="#777"
+                                placeholderTextColor="#94a3b8"
                                 autoCapitalize="words"
+                                returnKeyType="next"
                             />
                         </View>
 
                         {/* Phone Input */}
                         <View style={styles.formGroup}>
-                            <Text style={styles.label}>Phone Number</Text>
+                            <View style={styles.labelContainer}>
+                                <Text style={styles.label}>Phone Number</Text>
+                                <Text style={styles.charCount}>
+                                    {formData.phone.length}/10
+                                </Text>
+                            </View>
                             <TextInput
-                                style={[styles.input, focusedField === 'phone' && styles.inputFocused]}
+                                style={[
+                                    styles.input,
+                                    focusedField === 'phone' && styles.inputFocused,
+                                    formData.phone.length === 10 && styles.inputComplete
+                                ]}
                                 value={formData.phone}
                                 onChangeText={(value) => handleInputChange('phone', value)}
                                 onFocus={() => setFocusedField('phone')}
                                 onBlur={() => setFocusedField(null)}
-                                placeholder="Enter your phone number"
-                                placeholderTextColor="#777"
+                                placeholder="Enter 10-digit phone number"
+                                placeholderTextColor="#94a3b8"
                                 keyboardType="phone-pad"
                                 autoCapitalize="none"
+                                returnKeyType="next"
+                                maxLength={10}
                             />
                         </View>
 
                         {/* Password Input */}
                         <View style={styles.formGroup}>
                             <Text style={styles.label}>Password</Text>
-                            <View style={styles.inputContainer}>
+                            <View style={styles.passwordContainer}>
                                 <TextInput
                                     style={[
                                         styles.input,
@@ -139,244 +196,275 @@ const RegisterScreen = ({ navigation }) => {
                                     onChangeText={(value) => handleInputChange('password', value)}
                                     onFocus={() => setFocusedField('password')}
                                     onBlur={() => setFocusedField(null)}
-                                    placeholder="Create a password"
-                                    placeholderTextColor="#777"
+                                    placeholder="Create a strong password"
+                                    placeholderTextColor="#94a3b8"
                                     secureTextEntry={!showPassword}
                                     autoCapitalize="none"
+                                    returnKeyType="done"
                                 />
                                 <TouchableOpacity
                                     style={styles.eyeButton}
                                     onPress={togglePasswordVisibility}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.eyeIcon}>{showPassword ? '🐵' : '🙈'}</Text>
+                                    <Text style={styles.eyeIcon}>
+                                        {showPassword ? '👁️' : '👁️‍🗨️'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.registerButton}
-                            onPress={handleSubmit}
-                            activeOpacity={0.9}
-                        >
-                            <Text style={styles.registerButtonText}>Create Account</Text>
-                        </TouchableOpacity>
+                        {/* Register Button */}
+                        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                            <TouchableOpacity
+                                style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+                                onPress={handleSubmit}
+                                activeOpacity={0.9}
+                                disabled={isLoading}
+                            >
+                                <Text style={styles.registerButtonText}>
+                                    {isLoading ? 'Creating Account...' : 'Create Account'}
+                                </Text>
+                            </TouchableOpacity>
+                        </Animated.View>
 
+                        {/* Divider */}
+                        <View style={styles.divider}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>or</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
+                        {/* Login Redirect */}
                         <View style={styles.loginRedirectContainer}>
                             <Text style={styles.loginRedirectText}>
                                 Already have an account?{' '}
-                                <Text style={styles.loginRedirectLink} onPress={handleLoginRedirect}>
-                                    Login
-                                </Text>
                             </Text>
+                            <TouchableOpacity onPress={handleLoginRedirect}>
+                                <Text style={styles.loginRedirectLink}>Login</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
-                </View>
-            </View>
-        </KeyboardAvoidingView>
+
+                    {/* Security Note */}
+                    <View style={styles.securityNote}>
+                        <Text style={styles.securityText}>🔒 Your data is securely encrypted</Text>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f9ff',
+        backgroundColor: '#ffffff',
     },
-    background: {
+    keyboardAvoid: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: 'linear-gradient(135deg, #f5f9ff 0%, #e6f0ff 100%)',
     },
-    cardContainer: {
-        width: '100%',
-        maxWidth: 400,
-        backgroundColor: 'white',
-        borderRadius: 20,
-        shadowColor: '#0052cc',
+    scrollContainer: {
+        flexGrow: 1,
+        padding: 24,
+        backgroundColor: '#f8fafc',
+    },
+    header: {
+        alignItems: 'center',
+        marginTop: 20,
+        marginBottom: 30,
+    },
+    logoCircle: {
+        width: 80,
+        height: 80,
+        backgroundColor: '#2563eb',
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        shadowColor: '#2563eb',
         shadowOffset: {
             width: 0,
-            height: 10,
+            height: 8,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 30,
-        elevation: 15,
-        overflow: 'hidden',
-    },
-    cardContainerTablet: {
-        maxWidth: 800,
-        flexDirection: 'row',
-        height: 550,
-    },
-    welcomeSection: {
-        backgroundColor: '#1976D2',
-        padding: 25,
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: 100,
-        justifyContent: 'center',
-    },
-    welcomeSectionTablet: {
-        flex: 0.4,
-        minHeight: 'auto',
-        padding: 30,
-    },
-    circle1: {
-        position: 'absolute',
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        top: -25,
-        right: -25,
-    },
-    circle2: {
-        position: 'absolute',
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        bottom: -20,
-        left: -20,
-    },
-    welcomeContent: {
-        position: 'relative',
-        zIndex: 1,
-    },
-    welcomeTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: 'white',
-        textAlign: 'center',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
-    },
-    registerCard: {
-        padding: 30,
-    },
-    registerCardTablet: {
-        flex: 0.6,
-        padding: 40,
-        justifyContent: 'center',
-    },
-    logoContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
-    },
-    logoIcon: {
-        fontSize: 32,
-        marginRight: 12,
+        shadowOpacity: 0.25,
+        shadowRadius: 15,
+        elevation: 10,
     },
     logoText: {
-        fontSize: 26,
+        fontSize: 28,
         fontWeight: '800',
-        color: '#1976D2',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
-        letterSpacing: 0.8,
-        textShadowColor: 'rgba(25, 118, 210, 0.2)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
+        color: '#ffffff',
+        fontFamily: 'System',
+    },
+    appName: {
+        fontSize: 32,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 8,
+        fontFamily: 'System',
+        letterSpacing: 0.5,
+    },
+    welcomeSubtitle: {
+        fontSize: 16,
+        color: '#64748b',
+        textAlign: 'center',
+        fontFamily: 'System',
+    },
+    registerCard: {
+        backgroundColor: '#ffffff',
+        borderRadius: 20,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        marginBottom: 20,
+    },
+    registerCardTablet: {
+        maxWidth: 400,
+        alignSelf: 'center',
+        width: '100%',
     },
     registerTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 25,
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 32,
         textAlign: 'center',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontFamily: 'System',
     },
     formGroup: {
-        marginBottom: 18,
+        marginBottom: 20,
+    },
+    labelContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
     },
     label: {
-        fontSize: 15,
-        fontWeight: '500',
-        color: '#555',
-        marginBottom: 8,
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#334155',
+        fontFamily: 'System',
     },
-    inputContainer: {
+    charCount: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#64748b',
+        fontFamily: 'System',
+    },
+    passwordContainer: {
         position: 'relative',
     },
     input: {
-        backgroundColor: '#fafafa',
+        backgroundColor: '#f8fafc',
         borderWidth: 2,
-        borderColor: '#e0e0e0',
+        borderColor: '#e2e8f0',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 16,
         fontSize: 16,
-        color: '#333',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        color: '#1e293b',
+        fontFamily: 'System',
     },
     passwordInput: {
         paddingRight: 50,
     },
     inputFocused: {
-        borderColor: '#1976D2',
-        backgroundColor: 'white',
-        shadowColor: '#1976D2',
+        borderColor: '#2563eb',
+        backgroundColor: '#ffffff',
+        shadowColor: '#2563eb',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    inputComplete: {
+        borderColor: '#10b981',
+        backgroundColor: '#f0fdf4',
     },
     eyeButton: {
         position: 'absolute',
-        right: 15,
-        top: '20%',
-        transform: [{ translateY: -12 }],
-        padding: 2,
-        // backgroundColor: 'rgba(0,0,0,0.05)',
-        borderRadius: 6,
-        width: 50,
-        height: 60,
-        left: 'auto',
-        bottom: 'auto',
-        right: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        right: 12,
+        top: 12,
+        padding: 4,
+        zIndex: 10,
     },
     eyeIcon: {
-        right: 6,
-        fontSize: 35,
+        fontSize: 20,
+        color: '#64748b',
     },
     registerButton: {
-        backgroundColor: '#28a745',
+        backgroundColor: '#2563eb',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
-        marginTop: 15,
-        marginBottom: 20,
-        shadowColor: '#28a745',
-        shadowOffset: { width: 0, height: 4 },
+        marginBottom: 24,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    registerButtonDisabled: {
+        opacity: 0.7,
     },
     registerButtonText: {
-        color: 'white',
-        fontSize: 17,
+        color: '#ffffff',
+        fontSize: 18,
         fontWeight: '600',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
-        letterSpacing: 0.5,
+        fontFamily: 'System',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#e2e8f0',
+    },
+    dividerText: {
+        color: '#64748b',
+        paddingHorizontal: 16,
+        fontSize: 14,
+        fontWeight: '500',
+        fontFamily: 'System',
     },
     loginRedirectContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        flexWrap: 'wrap',
     },
     loginRedirectText: {
         fontSize: 15,
-        color: '#666',
-        textAlign: 'center',
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        color: '#64748b',
+        fontFamily: 'System',
     },
     loginRedirectLink: {
-        color: '#1976D2',
+        color: '#2563eb',
+        fontSize: 15,
         fontWeight: '600',
-        textDecorationLine: 'underline',
+        fontFamily: 'System',
+    },
+    securityNote: {
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
+    securityText: {
+        fontSize: 14,
+        color: '#94a3b8',
+        fontFamily: 'System',
     },
 });
 
