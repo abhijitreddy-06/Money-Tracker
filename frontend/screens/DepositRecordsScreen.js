@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const DepositRecordsScreen = ({ navigation }) => {
     const [depositRecords, setDepositRecords] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -50,7 +50,7 @@ const DepositRecordsScreen = ({ navigation }) => {
                 return;
             }
 
-            const response = await axios.get('http://YOUR_IP_ADDRESS:3000/deposit', {
+            const response = await axios.get(`${API_URL}/deposit`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

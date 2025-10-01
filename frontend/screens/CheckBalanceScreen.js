@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const CheckBalanceScreen = ({ navigation }) => {
     const [balance, setBalance] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +31,7 @@ const CheckBalanceScreen = ({ navigation }) => {
                     return;
                 }
 
-                const response = await axios.get('http://YOUR_IP_ADDRESS:3000/check-balance', {
+                const response = await axios.get(`${API_URL}/check-balance`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -120,7 +120,7 @@ const CheckBalanceScreen = ({ navigation }) => {
                     <Text style={styles.balanceTitle}>Your Current Balance</Text>
 
                     <Text style={styles.balanceAmount}>
-                        {isLoading ? '...' : (balance !== null ? `₹${balance.toLocaleString()}` : '--')}
+                        {isLoading ? '...' : (balance !== null ? '₹${balance.toLocaleString()}' : '--')}
                     </Text>
 
                     <Text style={styles.balanceSubtitle}>

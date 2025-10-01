@@ -10,7 +10,7 @@ import {
     ScrollView,
     SafeAreaView
 } from 'react-native';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const HomeScreen = ({ navigation }) => {
     const menuItems = [
         {
@@ -108,7 +108,7 @@ const HomeScreen = ({ navigation }) => {
             if (navigation) {
                 navigation.navigate(item.screen);
             } else {
-                Alert.alert(`Navigate to ${item.title}`, `Would go to ${item.screen} screen`);
+                Alert.alert('Navigate to ${item.title}', 'Would go to ${item.screen} screen');
             }
         }, 150);
     };
@@ -205,7 +205,7 @@ const HomeScreen = ({ navigation }) => {
                                 onPress={() => handleMenuItemPress(item, index)}
                                 activeOpacity={0.8}
                             >
-                                <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
+                                <View style={[styles.iconContainer, { backgroundColor: '${item.color}15' }]}>
                                     <Text style={[styles.menuIcon, { color: item.color }]}>
                                         {item.icon}
                                     </Text>

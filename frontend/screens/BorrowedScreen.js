@@ -7,7 +7,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from "../api/api";
 import * as SecureStore from 'expo-secure-store';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const BorrowedMoneyScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         amount: '',
@@ -86,7 +86,7 @@ const BorrowedMoneyScreen = ({ navigation }) => {
                 return;
             }
 
-            const response = await api.post('/borrow', {
+            const response = await api.post(`${API_URL}/borrow`, {
                 amount,
                 for_what: what,
                 from_whom: fromWhom,

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const BorrowedRecordsScreen = ({ navigation }) => {
     const [borrowedRecords, setBorrowedRecords] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ const BorrowedRecordsScreen = ({ navigation }) => {
                 navigation.navigate('Login');
                 return;
             }
-            const response = await axios.get('http://YOUR_IP_ADDRESS:3000/borrow', {
+            const response = await axios.get(`${API_URL}/borrow`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

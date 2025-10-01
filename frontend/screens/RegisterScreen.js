@@ -14,7 +14,7 @@ import {
     SafeAreaView
 } from 'react-native';
 import axios from 'axios';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const RegisterScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         name: '',
@@ -77,7 +77,7 @@ const RegisterScreen = ({ navigation }) => {
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://YOUR_IP_ADDRESS:3000/register', formData);
+            const response = await axios.post(`${API_URL}/register`, formData);
 
             if (response.status === 201) {
                 Alert.alert('Success', 'Account created successfully!', [

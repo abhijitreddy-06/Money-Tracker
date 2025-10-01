@@ -13,6 +13,7 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const BalanceInputScreen = ({ navigation }) => {
     const [balance, setBalance] = useState('');
     const [focusedField, setFocusedField] = useState(null);
@@ -52,7 +53,7 @@ const BalanceInputScreen = ({ navigation }) => {
 
         try {
             const token = await SecureStore.getItemAsync('authToken');
-            await axios.post('http://YOUR_IP_ADDRESS:3000/balance',
+            await axios.post(`${API_URL}/balance`,
                 { balance: balanceNumber },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

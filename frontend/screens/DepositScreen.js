@@ -15,7 +15,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const DepositScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         amount: '',
@@ -110,7 +110,7 @@ const DepositScreen = ({ navigation }) => {
             }
 
             const response = await axios.post(
-                'http://YOUR_IP_ADDRESS:3000/deposit',
+                `${API_URL}/deposit`,
                 {
                     amount: formData.amount,
                     fromWhom: formData.fromWhom,

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-
+const API_URL = 'https://money-tracker-05ny.onrender.com/api';
 const LoginScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         phone: '',
@@ -75,12 +75,12 @@ const LoginScreen = ({ navigation }) => {
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://YOUR_IP_ADDRESS:3000/login', formData);
+            const response = await axios.post(`${API_URL}/login`, formData);
 
             if (response.data.token) {
                 await SecureStore.setItemAsync('authToken', response.data.token);
 
-                const checkResponse = await axios.get('http://YOUR_IP_ADDRESS:3000/check-balance', {
+                const checkResponse = await axios.get(`${API_URL}/check-balance`, {
                     headers: { Authorization: `Bearer ${response.data.token}` }
                 });
 
