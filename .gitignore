@@ -1,0 +1,60 @@
+# ========================
+# Node.js / Backend
+# ========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env
+
+# ========================
+# React Native / Expo
+# ========================
+.expo/
+.expo-shared/
+*.expo
+*.expo-shared
+android/
+ios/
+*.keystore
+*.jks
+*.iml
+
+# ========================
+# Build outputs
+# ========================
+build/
+dist/
+*.apk
+*.aab
+*.app
+*.xcodeproj/
+*.xcworkspace/
+
+# ========================
+# OS / System files
+# ========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ========================
+# Logs
+# ========================
+logs/
+*.log
+*.log.*
+
+# ========================
+# Editor / IDE files
+# ========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.bak
+*.tmp
