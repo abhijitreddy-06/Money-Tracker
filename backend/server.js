@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,20 +16,19 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'abhi_secret';
+const PORT = process.env.PORT;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 //middlewares
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-//db connection
 const pool = new pg.Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // Test the database connection
@@ -69,7 +69,7 @@ const authenticateToken = (req, res, next) => {
 //bcrypt salt rounds
 const saltRounds = 10;
 //user registration
-app.post('/register', (req, res) => {
+app.post('/api/register', (req, res) => {
     const { name, phone, password } = req.body;
     const myPlaintextPassword = password;
     bcrypt.hash(myPlaintextPassword, saltRounds, function (err, hash) {
@@ -88,7 +88,7 @@ app.post('/register', (req, res) => {
 
 
 //user login
-app.post('/login', (req, res) => {
+app.post('/api/login', (req, res) => {
     const { phone, password } = req.body;
 
     if (!phone || !password) {
@@ -138,7 +138,7 @@ app.post('/login', (req, res) => {
 
 
 //current balance
-app.post('/balance', authenticateToken, async (req, res) => {
+app.post('/api/balance', authenticateToken, async (req, res) => {
     const { balance } = req.body;
     const userid = req.user.userid;
 
@@ -157,7 +157,7 @@ app.post('/balance', authenticateToken, async (req, res) => {
     }
 });
 // Check if balance exists for user
-app.get('/check-balance', authenticateToken, async (req, res) => {
+app.get('/api/check-balance', authenticateToken, async (req, res) => {
     const userid = req.user.userid;
 
     try {
@@ -178,7 +178,7 @@ app.get('/check-balance', authenticateToken, async (req, res) => {
 });
 
 //spent money
-app.post('/spend', authenticateToken, async (req, res) => {
+app.post('/api/spend', authenticateToken, async (req, res) => {
     const { amount, for_what, place, date } = req.body;
     const userid = req.user.userid;
 
@@ -202,7 +202,7 @@ app.post('/spend', authenticateToken, async (req, res) => {
 
 
 //lend money
-app.post('/lend', authenticateToken, async (req, res) => {
+app.post('/api/lend', authenticateToken, async (req, res) => {
     const { amount, to_whom, return_date } = req.body;
     const user_id = req.user.userid; // from JWT payload
 
@@ -261,7 +261,7 @@ app.post('/lend', authenticateToken, async (req, res) => {
 });
 
 
-app.get('/lend', authenticateToken, async (req, res) => {
+app.get('/api/lend', authenticateToken, async (req, res) => {
     const user_id = req.user.userid; // JWT payload
 
     try {
@@ -284,7 +284,7 @@ app.get('/lend', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/spend', authenticateToken, async (req, res) => {
+app.get('/api/spend', authenticateToken, async (req, res) => {
     const user_id = req.user.userid;
 
     try {
@@ -307,7 +307,7 @@ app.get('/spend', authenticateToken, async (req, res) => {
     }
 });
 // Get all borrowed records
-app.get('/borrow', authenticateToken, async (req, res) => {
+app.get('/api/borrow', authenticateToken, async (req, res) => {
     const user_id = req.user.userid;
 
     try {
@@ -331,7 +331,7 @@ app.get('/borrow', authenticateToken, async (req, res) => {
 });
 
 //borrow money
-app.post('/borrow', authenticateToken, async (req, res) => {
+app.post('/api/borrow', authenticateToken, async (req, res) => {
     const { amount, for_what, from_whom, return_date } = req.body;
     const userid = req.user.userid;
 
@@ -358,7 +358,7 @@ app.post('/borrow', authenticateToken, async (req, res) => {
 
 
 //deposit money
-app.post('/deposit', authenticateToken, async (req, res) => {
+app.post('/api/deposit', authenticateToken, async (req, res) => {
     const { amount, fromWhom, date } = req.body;
     const userid = req.user.userid;
 
@@ -385,7 +385,7 @@ app.post('/deposit', authenticateToken, async (req, res) => {
 
 //history
 
-app.get('/history', authenticateToken, async (req, res) => {
+app.get('/api/history', authenticateToken, async (req, res) => {
     const user_id = req.user.userid;
 
     const query = `
@@ -444,7 +444,7 @@ app.get('/history', authenticateToken, async (req, res) => {
 });
 
 // Get user profile + record counts
-app.get('/profile', authenticateToken, async (req, res) => {
+app.get('/api/profile', authenticateToken, async (req, res) => {
     const user_id = req.user.userid;
 
     try {
@@ -488,7 +488,7 @@ app.get('/profile', authenticateToken, async (req, res) => {
 });
 // Get all deposit records
 // Get all deposit records for the logged-in user
-app.get('/deposit', authenticateToken, async (req, res) => {
+app.get('/api/deposit', authenticateToken, async (req, res) => {
     const user_id = req.user.userid;
 
     try {
@@ -518,14 +518,14 @@ app.get('/deposit', authenticateToken, async (req, res) => {
 // app.get('/lend', authenticateToken, (req, res) => {
 //     res.json({ message: 'This is a protected route', user: req.user });
 // });
-app.get('/home', authenticateToken, (req, res) => {
+app.get('/api/home', authenticateToken, (req, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
 
 // app.get('/borrow', authenticateToken, (req, res) => {
 //     res.json({ message: 'This is a protected route', user: req.user });
 // });
-app.get('/profile', authenticateToken, (req, res) => {
+app.get('/api/profile', authenticateToken, (req, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
 
