@@ -204,29 +204,131 @@ app.post('/spend', authenticateToken, async (req, res) => {
 //lend money
 app.post('/lend', authenticateToken, async (req, res) => {
     const { amount, to_whom, return_date } = req.body;
-    const user_id = req.user.userid; // JWT payload
+    const user_id = req.user.userid; // from JWT payload
+
+    // Basic validation
+    if (!amount || !to_whom || !return_date) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+    if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ message: 'Amount must be a positive number' });
+    }
+
+    const client = await pool.connect();
 
     try {
+        await client.query('BEGIN');
+
+        // Check balance before lending
+        const balanceRes = await client.query(
+            'SELECT balance FROM users_balance WHERE userid = $1',
+            [user_id]
+        );
+
+        if (balanceRes.rows.length === 0) {
+            throw new Error('User balance record not found');
+        }
+
+        const currentBalance = balanceRes.rows[0].balance;
+
+        if (currentBalance < amount) {
+            throw new Error('Insufficient balance');
+        }
+
         // Insert lend record
-        await pool.query(
-            'INSERT INTO user_lend (user_id, amount, to_whom, return_date) VALUES ($1, $2, $3, $4)',
+        await client.query(
+            `INSERT INTO user_lend (user_id, amount, to_whom, return_date) 
+             VALUES ($1, $2, $3, $4)`,
             [user_id, amount, to_whom, return_date]
         );
 
-        // Deduct from balance
-        await pool.query(
+        // Deduct balance
+        await client.query(
             'UPDATE users_balance SET balance = balance - $1 WHERE userid = $2',
             [amount, user_id]
         );
 
+        await client.query('COMMIT');
         res.json({ message: 'Lend record added & balance updated successfully' });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Database error' });
+        await client.query('ROLLBACK');
+        console.error('Error in /lend:', err.message);
+        res.status(500).json({ message: err.message || 'Database error' });
+    } finally {
+        client.release();
     }
 });
 
 
+app.get('/lend', authenticateToken, async (req, res) => {
+    const user_id = req.user.userid; // JWT payload
+
+    try {
+        const result = await pool.query(
+            `SELECT lend_id, amount, to_whom, return_date, created_at
+             FROM user_lend
+             WHERE user_id = $1
+             ORDER BY created_at DESC`,
+            [user_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json({ message: 'No lend records yet' });
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching lend records:', err.message);
+        res.status(500).json({ message: 'Database error' });
+    }
+});
+
+app.get('/spend', authenticateToken, async (req, res) => {
+    const user_id = req.user.userid;
+
+    try {
+        const result = await pool.query(
+            `SELECT spend_id, amount, for_what, place, spend_date
+             FROM user_spend
+             WHERE user_id = $1
+             ORDER BY spend_date DESC`,
+            [user_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json({ message: 'No spend records yet' });
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching spend records:', err.message);
+        res.status(500).json({ message: 'Database error' });
+    }
+});
+// Get all borrowed records
+app.get('/borrow', authenticateToken, async (req, res) => {
+    const user_id = req.user.userid;
+
+    try {
+        const result = await pool.query(
+            `SELECT borrow_id, amount, for_what, from_whom, return_date, created_at
+             FROM user_borrow
+             WHERE userid = $1
+             ORDER BY created_at DESC`,
+            [user_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json({ message: 'No borrowed records yet' });
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching borrowed records:', err.message);
+        res.status(500).json({ message: 'Database error' });
+    }
+});
 
 //borrow money
 app.post('/borrow', authenticateToken, async (req, res) => {
@@ -341,27 +443,92 @@ app.get('/history', authenticateToken, async (req, res) => {
     }
 });
 
+// Get user profile + record counts
+app.get('/profile', authenticateToken, async (req, res) => {
+    const user_id = req.user.userid;
 
+    try {
+        // Fetch user info
+        const userResult = await pool.query(
+            'SELECT id, name, phone FROM users WHERE id = $1',
+            [user_id]
+        );
 
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
+        const user = userResult.rows[0];
 
+        // Fetch record counts
+        const [lendResult, spendResult, borrowResult, depositResult] = await Promise.all([
+            pool.query('SELECT COUNT(*) FROM user_lend WHERE user_id = $1', [user_id]),
+            pool.query('SELECT COUNT(*) FROM user_spend WHERE user_id = $1', [user_id]),
+            pool.query('SELECT COUNT(*) FROM user_borrow WHERE userid = $1', [user_id]),
+            pool.query('SELECT COUNT(*) FROM user_deposit WHERE user_id = $1', [user_id]),
+        ]);
 
-app.get('/lend', authenticateToken, (req, res) => {
-    res.json({ message: 'This is a protected route', user: req.user });
+        res.json({
+            user: {
+                id: user.id,
+                name: user.name,
+                phone: user.phone
+            },
+            records: {
+                lend: parseInt(lendResult.rows[0].count),
+                spent: parseInt(spendResult.rows[0].count),
+                borrowed: parseInt(borrowResult.rows[0].count),
+                deposit: parseInt(depositResult.rows[0].count)
+            }
+        });
+    } catch (err) {
+        console.error('Profile fetch error:', err);
+        res.status(500).json({ message: 'Database error' });
+    }
 });
+// Get all deposit records
+// Get all deposit records for the logged-in user
+app.get('/deposit', authenticateToken, async (req, res) => {
+    const user_id = req.user.userid;
+
+    try {
+        const result = await pool.query(
+            `SELECT deposit_id, amount, source, deposit_date, created_at
+             FROM user_deposit
+             WHERE user_id = $1
+             ORDER BY deposit_date DESC`,
+            [user_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json([]);
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching deposit records:', err.message);
+        res.status(500).json({ message: 'Database error' });
+    }
+});
+
+
+
+
+
+// app.get('/lend', authenticateToken, (req, res) => {
+//     res.json({ message: 'This is a protected route', user: req.user });
+// });
 app.get('/home', authenticateToken, (req, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
 
-app.get('/borrow', authenticateToken, (req, res) => {
-    res.json({ message: 'This is a protected route', user: req.user });
-});
+// app.get('/borrow', authenticateToken, (req, res) => {
+//     res.json({ message: 'This is a protected route', user: req.user });
+// });
 app.get('/profile', authenticateToken, (req, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'pages', 'login.html'));
-});
+
 
 app.listen(3000, '0.0.0.0', () => console.log('Server running on port 3000'));
 

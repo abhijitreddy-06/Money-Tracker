@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,91 +10,88 @@ import {
     SafeAreaView,
     Dimensions
 } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
 
 const ProfileScreen = ({ navigation }) => {
-    const [userData, setUserData] = useState({
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        phone: '+91 9876543210',
-        joinDate: 'Jan 2024'
-    });
-
-    const [records, setRecords] = useState({
-        lend: 5,
-        spent: 23,
-        borrowed: 3,
-        deposit: 8
-    });
+    const [userData, setUserData] = useState({ name: '', phone: '' });
+    const [records, setRecords] = useState({ lend: 0, spent: 0, borrowed: 0, deposit: 0 });
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
 
-    React.useEffect(() => {
+    useEffect(() => {
         Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 700,
-                useNativeDriver: true,
-            })
+            Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 700, useNativeDriver: true })
         ]).start();
+
+        const fetchProfile = async () => {
+            try {
+                const token = await SecureStore.getItemAsync('authToken');
+                if (!token) {
+                    console.warn('No token found!');
+                    return;
+                }
+
+                const response = await axios.get('http://YOUR_IP_ADDRESS:3000/profile', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                console.log('Profile response:', response.data);
+
+                if (response.data.user) setUserData(response.data.user);
+                if (response.data.records) setRecords(response.data.records);
+            } catch (err) {
+                console.error('Profile fetch error:', err.response?.data || err.message);
+                Alert.alert('Error', 'Unable to fetch profile');
+            }
+        };
+
+        fetchProfile();
     }, []);
+
 
     const handleLogout = () => {
         Alert.alert(
             'Logout',
             'Are you sure you want to logout?',
             [
-                {
-                    text: 'Cancel',
-                    style: 'cancel'
-                },
+                { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: () => {
-                        // Handle logout logic here
-                        navigation.replace('Login');
+                    onPress: async () => {
+                        try {
+                            // Delete the token
+                            await SecureStore.deleteItemAsync('authToken');
+                            // Navigate to Login screen
+                            navigation.replace('Login');
+                        } catch (err) {
+                            console.error('Error clearing token:', err);
+                            Alert.alert('Error', 'Failed to logout. Please try again.');
+                        }
                     }
                 }
             ]
         );
     };
 
-    const handleBack = () => {
-        navigation.goBack();
-    };
 
-    const handleEditProfile = () => {
-        Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
-    };
+    const handleBack = () => navigation.goBack();
+
+    const handleEditProfile = () => Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
 
     const handleRecordPress = (type) => {
-        let screenName = '';
-        switch (type) {
-            case 'lend':
-                screenName = 'LendRecords';
-                break;
-            case 'spent':
-                screenName = 'SpentRecords';
-                break;
-            case 'borrowed':
-                screenName = 'BorrowedRecords';
-                break;
-            case 'deposit':
-                screenName = 'DepositRecords';
-                break;
-        }
-
-        if (screenName) {
-            navigation.navigate(screenName);
-        } else {
-            Alert.alert('Coming Soon', 'This feature is under development');
-        }
+        const screens = {
+            lend: 'LendRecords',
+            spent: 'SpentRecords',
+            borrowed: 'BorrowedRecords',
+            deposit: 'DepositRecords'
+        };
+        const screenName = screens[type];
+        if (screenName) navigation.navigate(screenName);
+        else Alert.alert('Coming Soon', 'This feature is under development');
     };
 
     const { width } = Dimensions.get('window');
@@ -121,24 +118,13 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView style={styles.container}>
             {/* Navigation Header */}
             <View style={[styles.header, isTablet && styles.headerTablet]}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={handleBack}
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.backButtonContainer}>
-                        <Text style={styles.backIcon}>‹</Text>
-                        <Text style={styles.backText}>Back</Text>
-                    </View>
-                </TouchableOpacity>
-
+                <TouchableOpacity style={styles.backButton} onPress={handleBack} />
                 <View style={styles.logoContainer}>
                     <View style={styles.logoCircle}>
                         <Text style={styles.logoText}>MT</Text>
                     </View>
                     <Text style={styles.appName}>MoneyTracker</Text>
                 </View>
-
                 <View style={styles.headerPlaceholder} />
             </View>
 
@@ -157,7 +143,9 @@ const ProfileScreen = ({ navigation }) => {
                     <View style={styles.avatarContainer}>
                         <View style={styles.avatar}>
                             <Text style={styles.avatarText}>
-                                {userData.name.split(' ').map(n => n[0]).join('')}
+                                {userData.name
+                                    ? userData.name.split(' ').map(n => n[0]).join('')
+                                    : ''}
                             </Text>
                         </View>
                         <TouchableOpacity
@@ -169,15 +157,9 @@ const ProfileScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.userName}>{userData.name}</Text>
-                    <Text style={styles.userEmail}>{userData.email}</Text>
-                    <Text style={styles.userPhone}>{userData.phone}</Text>
+                    <Text style={styles.userName}>{userData.name || 'Your Name'}</Text>
+                    <Text style={styles.userPhone}>{userData.phone || '+91 XXXXX XXXXX'}</Text>
 
-                    <View style={styles.memberSince}>
-                        <Text style={styles.memberSinceText}>
-                            Member since {userData.joinDate}
-                        </Text>
-                    </View>
                 </Animated.View>
 
                 {/* Records Overview Section */}
@@ -191,63 +173,14 @@ const ProfileScreen = ({ navigation }) => {
                     <Text style={styles.sectionSubtitle}>Your financial activity summary</Text>
 
                     <View style={styles.recordsGrid}>
-                        <RecordCard
-                            title="Lend Records"
-                            count={records.lend}
-                            type="lend"
-                            color="#3b82f6"
-                            icon="📤"
-                        />
-                        <RecordCard
-                            title="Spent Records"
-                            count={records.spent}
-                            type="spent"
-                            color="#ef4444"
-                            icon="💸"
-                        />
-                        <RecordCard
-                            title="Borrowed Records"
-                            count={records.borrowed}
-                            type="borrowed"
-                            color="#f59e0b"
-                            icon="📥"
-                        />
-                        <RecordCard
-                            title="Deposit Records"
-                            count={records.deposit}
-                            type="deposit"
-                            color="#10b981"
-                            icon="💰"
-                        />
+                        <RecordCard title="Lend Records" count={records.lend} type="lend" color="#3b82f6" icon="📤" />
+                        <RecordCard title="Spent Records" count={records.spent} type="spent" color="#ef4444" icon="💸" />
+                        <RecordCard title="Borrowed Records" count={records.borrowed} type="borrowed" color="#f59e0b" icon="📥" />
+                        <RecordCard title="Deposit Records" count={records.deposit} type="deposit" color="#10b981" icon="💰" />
                     </View>
                 </Animated.View>
 
-                {/* Quick Stats Section */}
-                <Animated.View
-                    style={[
-                        styles.section,
-                        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
-                    ]}
-                >
-                    <Text style={styles.sectionTitle}>Quick Stats</Text>
 
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>₹15,000</Text>
-                            <Text style={styles.statLabel}>Total Balance</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>₹8,500</Text>
-                            <Text style={styles.statLabel}>Total Spent</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>₹2,000</Text>
-                            <Text style={styles.statLabel}>Total Lent</Text>
-                        </View>
-                    </View>
-                </Animated.View>
 
                 {/* Account Actions Section */}
                 <Animated.View
@@ -319,7 +252,6 @@ const ProfileScreen = ({ navigation }) => {
         </SafeAreaView>
     );
 };
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -380,10 +312,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     logoCircle: {
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         backgroundColor: '#2563eb',
-        borderRadius: 18,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 10,
@@ -397,7 +329,7 @@ const styles = StyleSheet.create({
         elevation: 6,
     },
     logoText: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '800',
         color: '#ffffff',
         fontFamily: 'System',
