@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-const API_URL = 'https://money-tracker-95ny.onrender.com/api';
+const API_BASE = "https://money-tracker-95ny.onrender.com";
 const HistoryScreen = ({ navigation }) => {
     const [historyRecords, setHistoryRecords] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -50,7 +50,7 @@ const HistoryScreen = ({ navigation }) => {
                 navigation.navigate('Login');
                 return;
             }
-            const response = await axios.get(`${API_URL}/history`, {
+            const response = await axios.get(`${API_BASE}/api/history`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setHistoryRecords(response.data);

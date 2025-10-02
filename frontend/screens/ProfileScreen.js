@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-const API_URL = 'https://money-tracker-95ny.onrender.com/api';
+const API_BASE = "https://money-tracker-95ny.onrender.com";
 const ProfileScreen = ({ navigation }) => {
     const [userData, setUserData] = useState({ name: '', phone: '' });
     const [records, setRecords] = useState({ lend: 0, spent: 0, borrowed: 0, deposit: 0 });
@@ -34,7 +34,7 @@ const ProfileScreen = ({ navigation }) => {
                     return;
                 }
 
-                const response = await axios.get(`${API_URL}/profile`, {
+                const response = await axios.get(`${API_BASE}/api/profile`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 

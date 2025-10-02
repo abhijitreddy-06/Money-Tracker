@@ -94,12 +94,15 @@ app.post('/api/login', (req, res) => {
     if (!phone || !password) {
         return res.status(400).json({ message: 'Phone and password are required' });
     }
+    console.log("Login request body:", req.body);
 
     pool.query('SELECT * FROM users WHERE phone = $1', [phone], (err, result) => {
         if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ message: 'Database error' });
         }
+        console.log("DB result:", result.rows);
+
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found. Please create an account.' });

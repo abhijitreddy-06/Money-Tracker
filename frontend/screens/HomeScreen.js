@@ -10,7 +10,7 @@ import {
     ScrollView,
     SafeAreaView
 } from 'react-native';
-const API_URL = 'https://money-tracker-95ny.onrender.com/api';
+const API_BASE = "https://money-tracker-95ny.onrender.com";
 const HomeScreen = ({ navigation }) => {
     const menuItems = [
         {
@@ -108,7 +108,7 @@ const HomeScreen = ({ navigation }) => {
             if (navigation) {
                 navigation.navigate(item.screen);
             } else {
-                Alert.alert('Navigate to ${item.title}', 'Would go to ${item.screen} screen');
+                Alert.alert(`Navigate to ${item.title}`, `Would go to ${item.screen} screen`);
             }
         }, 150);
     };
