@@ -528,7 +528,17 @@ app.get('/api/home', authenticateToken, (req, res) => {
 app.get('/api/profile', authenticateToken, (req, res) => {
     res.json({ message: 'This is a protected route', user: req.user });
 });
-
+app.get("/", (req, res) => {
+    res.json({ message: "Backend is alive 🚀" });
+});
+app.get("/health/db", async (req, res) => {
+    try {
+        const result = await pool.query("SELECT NOW()");
+        res.json({ status: "ok", time: result.rows[0].now });
+    } catch (err) {
+        res.status(500).json({ status: "error", error: err.message });
+    }
+});
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
