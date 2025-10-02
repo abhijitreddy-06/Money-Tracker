@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
+
 const API_BASE = "https://money-tracker-95ny.onrender.com";
+
 const SplashScreen = ({ navigation }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.3)).current;
@@ -8,14 +12,31 @@ const SplashScreen = ({ navigation }) => {
     const textSlide = useRef(new Animated.Value(30)).current;
 
     useEffect(() => {
-        // Logo rotation animation
+        // 🔹 Function to check token
+        const checkToken = async () => {
+            const token = await SecureStore.getItemAsync('authToken');
+            if (token) {
+                try {
+                    const response = await axios.get(`${API_BASE}/api/check-balance`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    return response.data.hasBalance ? 'Home' : 'BalanceInput';
+                } catch (err) {
+                    console.log("Token invalid or expired:", err.message);
+                    return 'Login';
+                }
+            } else {
+                return 'Login';
+            }
+        };
+
+        // 🔹 Run splash animations
         const rotate = Animated.timing(rotateAnim, {
             toValue: 1,
             duration: 1200,
             useNativeDriver: true,
         });
 
-        // Scale and fade animation
         const scaleFade = Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -29,20 +50,19 @@ const SplashScreen = ({ navigation }) => {
             })
         ]);
 
-        // Text slide animation
         const textAnimation = Animated.timing(textSlide, {
             toValue: 0,
             duration: 800,
             useNativeDriver: true,
         });
 
-        // Sequence animations
         Animated.sequence([
             Animated.parallel([rotate, scaleFade]),
             textAnimation
         ]).start();
 
-        const timer = setTimeout(() => {
+        // 🔹 Delay for splash + auth check
+        const timer = setTimeout(async () => {
             Animated.parallel([
                 Animated.timing(fadeAnim, {
                     toValue: 0,
@@ -54,8 +74,9 @@ const SplashScreen = ({ navigation }) => {
                     duration: 600,
                     useNativeDriver: true,
                 })
-            ]).start(() => {
-                navigation.replace('Login');
+            ]).start(async () => {
+                const screen = await checkToken(); // 🔹 Determine next screen
+                navigation.replace(screen);
             });
         }, 3000);
 
@@ -78,9 +99,7 @@ const SplashScreen = ({ navigation }) => {
             ]}>
                 <Animated.View style={[
                     styles.logoContainer,
-                    {
-                        transform: [{ rotate: rotateInterpolate }]
-                    }
+                    { transform: [{ rotate: rotateInterpolate }] }
                 ]}>
                     <View style={styles.logo}>
                         <Text style={styles.logoText}>MT</Text>
@@ -91,6 +110,9 @@ const SplashScreen = ({ navigation }) => {
                     <Text style={styles.appName}>MoneyTracker</Text>
                     <Text style={styles.tagline}>Manage Your Finances Wisely</Text>
                 </Animated.View>
+
+                {/* Optional: loader while auth check finishes */}
+                <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 20 }} />
             </Animated.View>
         </View>
     );

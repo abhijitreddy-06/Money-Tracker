@@ -120,7 +120,7 @@ const CheckBalanceScreen = ({ navigation }) => {
                     <Text style={styles.balanceTitle}>Your Current Balance</Text>
 
                     <Text style={styles.balanceAmount}>
-                        {isLoading ? '...' : (balance !== null ? '₹${balance.toLocaleString()}' : '--')}
+                        {isLoading ? '...' : (balance !== null ? `₹${balance.toLocaleString()}` : '--')}
                     </Text>
 
                     <Text style={styles.balanceSubtitle}>

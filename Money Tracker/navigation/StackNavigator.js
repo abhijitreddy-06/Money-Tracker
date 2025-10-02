@@ -18,6 +18,7 @@ import LendRecordsScreen from '../screens/LendRecordsScreen';
 import SpentRecordsScreen from '../screens/SpentRecordsScreen';
 import BorrowedRecordsScreen from '../screens/BorrowedRecordsScreen';
 import DepositRecordsScreen from '../screens/DepositRecordsScreen';
+
 const Stack = createNativeStackNavigator();
 
 export default function StackNavigator() {
@@ -47,6 +48,7 @@ export default function StackNavigator() {
                 <Stack.Screen name="SpentRecords" component={SpentRecordsScreen} />
                 <Stack.Screen name="BorrowedRecords" component={BorrowedRecordsScreen} />
                 <Stack.Screen name="DepositRecords" component={DepositRecordsScreen} />
+               
             </Stack.Navigator>
         </NavigationContainer>
     );
