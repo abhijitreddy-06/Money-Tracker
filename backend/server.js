@@ -55,8 +55,8 @@ const authenticateToken = (req, res, next) => {
                 return res.status(403).json({ message: 'Token is invalid.' });
             }
 
-           
-            req.user = decoded; 
+
+            req.user = decoded;
             console.log("Decoded JWT payload:", decoded);
 
             next();
@@ -233,10 +233,6 @@ app.post('/api/lend', authenticateToken, async (req, res) => {
         }
 
         const currentBalance = balanceRes.rows[0].balance;
-
-        if (currentBalance < amount) {
-            throw new Error('Insufficient balance');
-        }
 
         // Insert lend record
         await client.query(
